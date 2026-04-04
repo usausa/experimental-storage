@@ -1,20 +1,54 @@
-namespace StorageServer.Api.S3;
+namespace StorageServer.Helpers;
 
 using System.Xml.Linq;
 
+using StorageServer.Storage;
 using StorageServer.Storage.Models;
 
 /// <summary>
-/// Helper methods for building and parsing S3-compatible XML documents.
+/// Helper methods for building/parsing S3-compatible XML documents
+/// and converting <see cref="StorageException"/> to S3 error responses.
 /// </summary>
-public static class S3XmlHelper
+public static class S3Helper
 {
     private static readonly XNamespace S3Ns = "http://s3.amazonaws.com/doc/2006-03-01/";
+
+    // ================================================================
+    //  Error helpers
+    // ================================================================
+
+    public static IResult ToS3Error(StorageException ex, string? requestId = null)
+    {
+        if (ex is NotModifiedException)
+        {
+            return Results.StatusCode(304);
+        }
+
+        var doc = new XDocument(
+            new XDeclaration("1.0", "UTF-8", null),
+            new XElement(S3Ns + "Error",
+                new XElement(S3Ns + "Code", ex.ErrorCode),
+                new XElement(S3Ns + "Message", ex.Message),
+                new XElement(S3Ns + "RequestId", requestId ?? Guid.NewGuid().ToString("N"))));
+
+        return Results.Content(
+            doc.Declaration + doc.ToString(),
+            "application/xml",
+            statusCode: ex.HttpStatusCode);
+    }
+
+    // ================================================================
+    //  XML result helpers
+    // ================================================================
 
     public static IResult Xml(XDocument doc)
     {
         return Results.Content(doc.Declaration + doc.ToString(), "application/xml");
     }
+
+    // ================================================================
+    //  XML document builders
+    // ================================================================
 
     public static XDocument ListAllMyBucketsResult(IReadOnlyList<BucketInfo> buckets)
     {
@@ -107,8 +141,7 @@ public static class S3XmlHelper
     public static Dictionary<string, string> ParseTagging(XDocument doc)
     {
         var tags = new Dictionary<string, string>();
-        var tagSet = doc.Descendants().Where(e => e.Name.LocalName == "Tag");
-        foreach (var tag in tagSet)
+        foreach (var tag in doc.Descendants().Where(e => e.Name.LocalName == "Tag"))
         {
             var key = tag.Elements().FirstOrDefault(e => e.Name.LocalName == "Key")?.Value;
             var value = tag.Elements().FirstOrDefault(e => e.Name.LocalName == "Value")?.Value;
@@ -283,9 +316,6 @@ public static class S3XmlHelper
                     new XElement(S3Ns + "LastModified", p.LastModified.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))))));
     }
 
-    /// <summary>
-    /// Builds a VersioningConfiguration XML response.
-    /// </summary>
     public static XDocument VersioningConfiguration(string status)
     {
         return new XDocument(

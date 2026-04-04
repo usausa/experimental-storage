@@ -2,6 +2,7 @@ namespace StorageServer.Api.S3;
 
 using System.Xml.Linq;
 
+using StorageServer.Helpers;
 using StorageServer.Storage;
 using StorageServer.Storage.Models;
 
@@ -32,7 +33,7 @@ public static class S3Endpoints
     private static async Task<IResult> HandleListBuckets(IStorageService storage)
     {
         var buckets = await storage.ListBucketsAsync();
-        return S3XmlHelper.Xml(S3XmlHelper.ListAllMyBucketsResult(buckets));
+        return S3Helper.Xml(S3Helper.ListAllMyBucketsResult(buckets));
     }
 
     // ===== Bucket GET =====
@@ -45,26 +46,26 @@ public static class S3Endpoints
         if (query.ContainsKey("location"))
         {
             var info = await storage.GetBucketInfoAsync(bucket);
-            return S3XmlHelper.Xml(S3XmlHelper.LocationConstraint(info.Region));
+            return S3Helper.Xml(S3Helper.LocationConstraint(info.Region));
         }
         if (query.ContainsKey("tagging"))
         {
             var tags = await storage.GetBucketTagsAsync(bucket);
-            return S3XmlHelper.Xml(S3XmlHelper.Tagging(tags));
+            return S3Helper.Xml(S3Helper.Tagging(tags));
         }
         if (query.ContainsKey("acl"))
         {
             var acl = await storage.GetBucketAclAsync(bucket);
-            return S3XmlHelper.Xml(S3XmlHelper.AccessControlPolicy(acl));
+            return S3Helper.Xml(S3Helper.AccessControlPolicy(acl));
         }
         if (query.ContainsKey("cors"))
         {
             var cors = await storage.GetBucketCorsAsync(bucket);
-            return S3XmlHelper.Xml(S3XmlHelper.CorsConfiguration(cors));
+            return S3Helper.Xml(S3Helper.CorsConfiguration(cors));
         }
         if (query.ContainsKey("versioning"))
         {
-            return S3XmlHelper.Xml(S3XmlHelper.VersioningConfiguration("Enabled"));
+            return S3Helper.Xml(S3Helper.VersioningConfiguration("Enabled"));
         }
         if (query.ContainsKey("lifecycle") || query.ContainsKey("policy") ||
             query.ContainsKey("logging") || query.ContainsKey("notification") ||
@@ -75,7 +76,7 @@ public static class S3Endpoints
         if (query.ContainsKey("uploads"))
         {
             var uploads = await storage.ListMultipartUploadsAsync(bucket);
-            return S3XmlHelper.Xml(S3XmlHelper.ListMultipartUploadsResult(bucket, uploads));
+            return S3Helper.Xml(S3Helper.ListMultipartUploadsResult(bucket, uploads));
         }
 
         var options = new ListObjectsOptions
@@ -87,7 +88,7 @@ public static class S3Endpoints
             ContinuationToken = query["continuation-token"].FirstOrDefault()
         };
         var result = await storage.ListObjectsAsync(bucket, options);
-        return S3XmlHelper.Xml(S3XmlHelper.ListBucketResult(bucket, result, options));
+        return S3Helper.Xml(S3Helper.ListBucketResult(bucket, result, options));
     }
 
     // ===== Bucket PUT =====
@@ -100,7 +101,7 @@ public static class S3Endpoints
         if (query.ContainsKey("tagging"))
         {
             var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
-            var tags = S3XmlHelper.ParseTagging(doc);
+            var tags = S3Helper.ParseTagging(doc);
             await storage.PutBucketTagsAsync(bucket, tags);
             return Results.Ok();
         }
@@ -113,7 +114,7 @@ public static class S3Endpoints
         if (query.ContainsKey("cors"))
         {
             var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
-            var rules = S3XmlHelper.ParseCorsConfiguration(doc);
+            var rules = S3Helper.ParseCorsConfiguration(doc);
             await storage.PutBucketCorsAsync(bucket, rules);
             return Results.Ok();
         }
@@ -166,9 +167,9 @@ public static class S3Endpoints
         if (ctx.Request.Query.ContainsKey("delete"))
         {
             var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
-            var keys = S3XmlHelper.ParseDeleteObjects(doc);
+            var keys = S3Helper.ParseDeleteObjects(doc);
             var results = await storage.DeleteObjectsAsync(bucket, keys);
-            return S3XmlHelper.Xml(S3XmlHelper.DeleteResult(results));
+            return S3Helper.Xml(S3Helper.DeleteResult(results));
         }
         return Results.BadRequest();
     }
@@ -183,18 +184,18 @@ public static class S3Endpoints
         if (query.ContainsKey("tagging"))
         {
             var tags = await storage.GetObjectTagsAsync(bucket, key);
-            return S3XmlHelper.Xml(S3XmlHelper.Tagging(tags));
+            return S3Helper.Xml(S3Helper.Tagging(tags));
         }
         if (query.ContainsKey("acl"))
         {
             var acl = await storage.GetObjectAclAsync(bucket, key);
-            return S3XmlHelper.Xml(S3XmlHelper.AccessControlPolicy(acl));
+            return S3Helper.Xml(S3Helper.AccessControlPolicy(acl));
         }
         if (query.ContainsKey("uploadId"))
         {
             var uploadId = query["uploadId"].First()!;
             var parts = await storage.ListPartsAsync(uploadId);
-            return S3XmlHelper.Xml(S3XmlHelper.ListPartsResult(bucket, key, uploadId, parts));
+            return S3Helper.Xml(S3Helper.ListPartsResult(bucket, key, uploadId, parts));
         }
 
         var options = new GetObjectOptions();
@@ -264,7 +265,7 @@ public static class S3Endpoints
         if (query.ContainsKey("tagging"))
         {
             var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
-            var tags = S3XmlHelper.ParseTagging(doc);
+            var tags = S3Helper.ParseTagging(doc);
             await storage.PutObjectTagsAsync(bucket, key, tags);
             return Results.Ok();
         }
@@ -311,7 +312,7 @@ public static class S3Endpoints
             }
 
             var copyResult = await storage.CopyObjectAsync(bucket, key, srcBucket, srcKey, copyOptions);
-            return S3XmlHelper.Xml(S3XmlHelper.CopyObjectResult(copyResult));
+            return S3Helper.Xml(S3Helper.CopyObjectResult(copyResult));
         }
 
         // PutObject
@@ -385,16 +386,16 @@ public static class S3Endpoints
         {
             var options = ExtractPutOptions(ctx.Request.Headers);
             var uploadId = await storage.CreateMultipartUploadAsync(bucket, key, options);
-            return S3XmlHelper.Xml(S3XmlHelper.InitiateMultipartUploadResult(bucket, key, uploadId));
+            return S3Helper.Xml(S3Helper.InitiateMultipartUploadResult(bucket, key, uploadId));
         }
 
         if (query.ContainsKey("uploadId"))
         {
             var uploadId = query["uploadId"].First()!;
             var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
-            var parts = S3XmlHelper.ParseCompleteMultipartUpload(doc);
+            var parts = S3Helper.ParseCompleteMultipartUpload(doc);
             var result = await storage.CompleteMultipartUploadAsync(uploadId, parts);
-            return S3XmlHelper.Xml(S3XmlHelper.CompleteMultipartUploadResult(result));
+            return S3Helper.Xml(S3Helper.CompleteMultipartUploadResult(result));
         }
 
         return Results.BadRequest();
@@ -411,7 +412,7 @@ public static class S3Endpoints
         if (contentEncoding.Contains("aws-chunked", StringComparison.OrdinalIgnoreCase) ||
             contentSha256.StartsWith("STREAMING-", StringComparison.OrdinalIgnoreCase))
         {
-            return new S3ChunkedStream(ctx.Request.Body);
+            return new ChunkedStream(ctx.Request.Body);
         }
 
         return ctx.Request.Body;

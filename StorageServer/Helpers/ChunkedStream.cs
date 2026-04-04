@@ -1,11 +1,11 @@
-namespace StorageServer.Api.S3;
+namespace StorageServer.Helpers;
 
 /// <summary>
-/// Wraps a stream containing AWS chunked transfer encoding (aws-chunked) and
-/// decodes it on the fly, stripping hex chunk sizes, chunk-signature headers,
-/// and trailing headers so that only the raw object data is yielded to callers.
+/// Decodes chunked transfer encoding (e.g. AWS aws-chunked) on the fly,
+/// stripping hex chunk sizes and extension headers so that only the raw
+/// payload bytes are yielded to callers.
 /// </summary>
-public sealed class S3ChunkedStream : Stream
+public sealed class ChunkedStream : Stream
 {
     private readonly Stream inner;
     private readonly byte[] lineBuffer = new byte[4096];
@@ -13,7 +13,7 @@ public sealed class S3ChunkedStream : Stream
     private int chunkRemaining;
     private bool finished;
 
-    public S3ChunkedStream(Stream inner)
+    public ChunkedStream(Stream inner)
     {
         ArgumentNullException.ThrowIfNull(inner);
         this.inner = inner;
@@ -32,8 +32,10 @@ public sealed class S3ChunkedStream : Stream
     public override void Flush()
     {
     }
+
     public override int Read(byte[] buffer, int offset, int count) =>
         ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
     public override void SetLength(long value) => throw new NotSupportedException();
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
@@ -69,6 +71,7 @@ public sealed class S3ChunkedStream : Stream
                 }
             }
 
+            // Parse: {hex_size}[;extensions...]
             var semiIdx = headerLine.IndexOf(';');
             var hexPart = semiIdx >= 0 ? headerLine[..semiIdx] : headerLine;
             chunkRemaining = Convert.ToInt32(hexPart, 16);
@@ -119,6 +122,7 @@ public sealed class S3ChunkedStream : Stream
 
     protected override void Dispose(bool disposing)
     {
+        // The inner stream is owned by the request pipeline; do not dispose it.
         base.Dispose(disposing);
     }
 }

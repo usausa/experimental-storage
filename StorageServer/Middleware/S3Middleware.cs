@@ -2,7 +2,7 @@ namespace StorageServer.Middleware;
 
 using System.Globalization;
 
-using StorageServer.Api.S3;
+using StorageServer.Helpers;
 using StorageServer.Storage;
 
 /// <summary>
@@ -37,7 +37,7 @@ public sealed class S3Middleware(RequestDelegate next)
         }
         catch (StorageException ex) when (!context.Response.HasStarted)
         {
-            var result = S3ErrorHelper.ToS3Error(ex, requestId);
+            var result = S3Helper.ToS3Error(ex, requestId);
             await result.ExecuteAsync(context);
         }
     }
