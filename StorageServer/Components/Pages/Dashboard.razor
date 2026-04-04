@@ -1,0 +1,186 @@
+@page "/"
+@inject IStorageService Storage
+@rendermode InteractiveServer
+
+<PageTitle>StorageServer - Buckets</PageTitle>
+
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h2>Buckets</h2>
+        <button class="btn-se-primary" @onclick="ShowCreateDialog">
+            <i class="bi bi-plus-lg"></i> Create Bucket
+        </button>
+    </div>
+
+    @if (loading)
+    {
+        <div class="fb-empty">
+            <div class="spinner-se spinner-se-lg" role="status"></div>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="fb-error-toast">
+            <i class="bi bi-exclamation-circle"></i>
+            <span>@error</span>
+            <button class="btn-se-icon" @onclick="() => error = null"><i class="bi bi-x"></i></button>
+        </div>
+    }
+    else if (buckets.Count == 0)
+    {
+        <div class="bucket-table" style="border: none;">
+            <div class="bucket-empty">
+                <div class="bucket-empty-icon">
+                    <i class="bi bi-bucket"></i>
+                </div>
+                <h3>No buckets yet</h3>
+                <p>Create a bucket to get started</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="bucket-table">
+            <div class="bucket-table-header">
+                <div class="bucket-col-icon"></div>
+                <div class="bucket-col-name">Name</div>
+                <div class="bucket-col-created">Created</div>
+                <div class="bucket-col-objects">Objects</div>
+                <div class="bucket-col-size">Size</div>
+                <div class="bucket-col-actions"></div>
+            </div>
+            @foreach (var b in buckets)
+            {
+                <div class="bucket-table-row">
+                    <div class="bucket-col-icon">
+                        <i class="bi bi-bucket-fill bucket-icon"></i>
+                    </div>
+                    <div class="bucket-col-name">
+                        <a href="/browse/@b.Info.Name">@b.Info.Name</a>
+                    </div>
+                    <div class="bucket-col-created">@b.Info.CreatedAt.LocalDateTime.ToString("MMM d, yyyy HH:mm")</div>
+                    <div class="bucket-col-objects">@(b.Stats?.ObjectCount ?? 0)</div>
+                    <div class="bucket-col-size">@FormatBytes(b.Stats?.TotalSizeBytes ?? 0)</div>
+                    <div class="bucket-col-actions">
+                        <button class="btn-se-icon" title="Tags" @onclick="() => OpenBucketTags(b.Info.Name)">
+                            <i class="bi bi-tags"></i>
+                        </button>
+                        <button class="btn-se-icon" title="Delete" @onclick="() => ConfirmDeleteBucket(b.Info.Name)">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @* Create bucket modal *@
+    @if (showCreate)
+    {
+        <div class="fb-modal-backdrop" @onclick="() => showCreate = false"></div>
+        <div class="fb-modal" @onclick:stopPropagation>
+            <div class="fb-modal-header">
+                <span>Create Bucket</span>
+                <button class="btn-se-icon" @onclick="() => showCreate = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="fb-modal-body">
+                <input type="text" placeholder="Bucket name"
+                       @bind="newBucketName" @bind:event="oninput"
+                       @onkeyup="HandleCreateKeyUp" />
+                @if (createError != null)
+                {
+                    <p class="fb-modal-warn" style="margin-top: 8px;">@createError</p>
+                }
+            </div>
+            <div class="fb-modal-footer">
+                <button class="btn-se-ghost" @onclick="() => showCreate = false">Cancel</button>
+                <button class="btn-se-primary" @onclick="CreateBucket">Create</button>
+            </div>
+        </div>
+    }
+
+    @* Delete confirmation modal *@
+    @if (showDeleteConfirm)
+    {
+        <div class="fb-modal-backdrop" @onclick="() => showDeleteConfirm = false"></div>
+        <div class="fb-modal" @onclick:stopPropagation>
+            <div class="fb-modal-header">
+                <span>Delete Bucket</span>
+                <button class="btn-se-icon" @onclick="() => showDeleteConfirm = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="fb-modal-body">
+                <p>Are you sure you want to delete <strong>@deleteBucketName</strong>?</p>
+                <p class="fb-modal-warn">This action cannot be undone.</p>
+            </div>
+            <div class="fb-modal-footer">
+                <button class="btn-se-ghost" @onclick="() => showDeleteConfirm = false">Cancel</button>
+                <button class="btn-se-primary" style="background: var(--se-danger);" @onclick="DeleteBucket">Delete</button>
+            </div>
+        </div>
+    }
+</div>
+
+@* Bucket Tags dialog *@
+@if (tagsBucketName is not null)
+{
+    <div class="fb-modal-backdrop" @onclick="CloseBucketTags"></div>
+    <div class="fb-modal meta-dialog" @onclick:stopPropagation>
+        <div class="fb-modal-header">
+            <span>Tags – @tagsBucketName</span>
+            <button class="btn-se-icon" @onclick="CloseBucketTags"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="fb-modal-body" style="max-height: 60vh; overflow-y: auto;">
+            @if (tagsLoading)
+            {
+                <div style="text-align: center; padding: 20px;">
+                    <div class="spinner-se spinner-se-lg" role="status"></div>
+                </div>
+            }
+            else
+            {
+                <div class="meta-section">
+                    <div class="meta-section-header">
+                        <h4 class="meta-section-title">Bucket Tags</h4>
+                        <button class="btn-se-ghost" style="padding: 2px 8px; font-size: 0.75rem;" @onclick="AddBucketTag">
+                            <i class="bi bi-plus"></i> Add
+                        </button>
+                    </div>
+                    @if (editBucketTags.Count == 0)
+                    {
+                        <p class="meta-empty">No tags</p>
+                    }
+                    else
+                    {
+                        @for (var i = 0; i < editBucketTags.Count; i++)
+                        {
+                            var idx = i;
+                            <div class="meta-edit-row">
+                                <input type="text" class="meta-input" placeholder="Key" value="@editBucketTags[idx].Key"
+                                       @onchange="e => UpdateBucketTagKey(idx, e)" />
+                                <input type="text" class="meta-input" placeholder="Value" value="@editBucketTags[idx].Value"
+                                       @onchange="e => UpdateBucketTagValue(idx, e)" />
+                                <button class="btn-se-icon" style="width: 28px; height: 28px; font-size: 0.8rem;" @onclick="() => editBucketTags.RemoveAt(idx)">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        }
+                    }
+                </div>
+                @if (tagsError is not null)
+                {
+                    <p class="fb-modal-warn" style="margin-top: 8px;">@tagsError</p>
+                }
+            }
+        </div>
+        <div class="fb-modal-footer">
+            <button class="btn-se-ghost" @onclick="CloseBucketTags">Cancel</button>
+            <button class="btn-se-primary" @onclick="SaveBucketTags" disabled="@tagsSaving">
+                @if (tagsSaving)
+                {
+                    <div class="spinner-se" role="status" style="width: 0.8rem; height: 0.8rem;"></div>
+                }
+                Save
+            </button>
+        </div>
+    </div>
+}

@@ -1,0 +1,320 @@
+@page "/browse/{Bucket}/{**Prefix}"
+@page "/browse/{Bucket}"
+@inject IStorageService Storage
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>@Bucket - StorageServer</PageTitle>
+
+<div class="fb" @ref="dropZoneRef">
+    @* Drop zone overlay *@
+    <div class="fb-drop-overlay">
+        <div class="fb-drop-overlay-content">
+            <i class="bi bi-cloud-arrow-up"></i>
+            <span>Drop files to upload</span>
+        </div>
+    </div>
+
+    @* Hidden file input for JS upload *@
+    <input type="file" multiple @ref="fileInputRef" style="display: none;" />
+
+    @* Action bar *@
+    <div class="fb-actions">
+        <div class="fb-actions-left">
+            <nav class="fb-breadcrumb">
+                <a class="fb-crumb" href="/">
+                    <i class="bi bi-house-door"></i>
+                    <span>Buckets</span>
+                </a>
+                <i class="bi bi-chevron-right fb-crumb-sep"></i>
+                @if (string.IsNullOrEmpty(Prefix))
+                {
+                    <span class="fb-crumb current">
+                        <i class="bi bi-bucket-fill" style="color: var(--se-primary);"></i>
+                        @Bucket
+                    </span>
+                }
+                else
+                {
+                    <a class="fb-crumb" href="/browse/@Bucket">
+                        <i class="bi bi-bucket-fill" style="color: var(--se-primary);"></i>
+                        @Bucket
+                    </a>
+                    @foreach (var (name, path, isLast) in GetBreadcrumbs())
+                    {
+                        <i class="bi bi-chevron-right fb-crumb-sep"></i>
+                        @if (isLast)
+                        {
+                            <span class="fb-crumb current">@name</span>
+                        }
+                        else
+                        {
+                            <a class="fb-crumb" href="/browse/@Bucket/@path">@name</a>
+                        }
+                    }
+                }
+            </nav>
+        </div>
+        <div class="fb-actions-right">
+            <button class="btn-se-primary" @onclick="TriggerFileInput">
+                <i class="bi bi-cloud-arrow-up"></i> Upload
+            </button>
+            <button class="btn-se-ghost" @onclick="ShowNewFolderInput">
+                <i class="bi bi-folder-plus"></i> New folder
+            </button>
+        </div>
+    </div>
+
+    @* Error toast *@
+    @if (error != null)
+    {
+        <div class="fb-error-toast">
+            <i class="bi bi-exclamation-circle"></i>
+            <span>@error</span>
+            <button class="btn-se-icon" @onclick="() => error = null"><i class="bi bi-x"></i></button>
+        </div>
+    }
+
+    @* New folder inline *@
+    @if (creatingFolder)
+    {
+        <div class="fb-new-folder">
+            <i class="bi bi-folder-plus" style="color: var(--se-primary); font-size: 1.1rem;"></i>
+            <input type="text" class="fb-new-folder-input" placeholder="Folder name"
+                   @bind="newFolderName" @bind:event="oninput"
+                   @onkeyup="HandleFolderKeyUp" />
+            <button class="btn-se-primary" style="padding: 5px 14px;" @onclick="CreateFolder">Create</button>
+            <button class="btn-se-ghost" style="padding: 5px 12px;" @onclick="() => creatingFolder = false">Cancel</button>
+        </div>
+    }
+
+    @* Upload progress toast *@
+    @if (uploading)
+    {
+        <div class="fb-upload-toast">
+            <div class="fb-upload-toast-content">
+                <div class="spinner-se" role="status"></div>
+                <span>Uploading @uploadCompletedFiles of @uploadTotalFiles files...</span>
+            </div>
+            <div class="fb-upload-bar">
+                <div class="fb-upload-bar-fill" style="width: @UploadPercent%"></div>
+            </div>
+        </div>
+    }
+
+    @* Content area *@
+    <div class="fb-content">
+        @if (loading)
+        {
+            <div class="fb-empty">
+                <div class="spinner-se spinner-se-lg" role="status"></div>
+            </div>
+        }
+        else if (directories.Count == 0 && objects.Count == 0)
+        {
+            <div class="fb-empty">
+                <div class="fb-empty-icon">
+                    <i class="bi bi-cloud-arrow-up"></i>
+                </div>
+                <h3>This folder is empty</h3>
+                <p>Upload files or drag & drop to get started</p>
+            </div>
+        }
+        else
+        {
+            <div class="fb-list">
+                <div class="fb-list-header">
+                    <div class="fb-col-icon"></div>
+                    <div class="fb-col-name fb-sortable" @onclick='() => ToggleSort("name")'>
+                        Name @SortIcon("name")
+                    </div>
+                    <div class="fb-col-size fb-sortable" @onclick='() => ToggleSort("size")'>
+                        Size @SortIcon("size")
+                    </div>
+                    <div class="fb-col-modified fb-sortable" @onclick='() => ToggleSort("modified")'>
+                        Modified @SortIcon("modified")
+                    </div>
+                    <div class="fb-col-actions"></div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Prefix))
+                {
+                    <div class="fb-list-row fb-row-parent" @onclick="NavigateUp">
+                        <div class="fb-col-icon">
+                            <i class="bi bi-arrow-90deg-up fb-icon-parent"></i>
+                        </div>
+                        <div class="fb-col-name">..</div>
+                        <div class="fb-col-size"></div>
+                        <div class="fb-col-modified"></div>
+                        <div class="fb-col-actions"></div>
+                    </div>
+                }
+
+                @foreach (var dir in directories)
+                {
+                    var dirName = dir.TrimEnd('/').Split('/').Last();
+                    <div class="fb-list-row fb-row-folder" @onclick="() => NavigateTo(dir)">
+                        <div class="fb-col-icon">
+                            <i class="bi bi-folder-fill fb-icon-folder"></i>
+                        </div>
+                        <div class="fb-col-name">@dirName</div>
+                        <div class="fb-col-size">—</div>
+                        <div class="fb-col-modified">—</div>
+                        <div class="fb-col-actions">
+                            <button class="btn-se-icon" title="Delete"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => DeletePrefix(dir)">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                @foreach (var obj in SortedObjects)
+                {
+                    var displayName = obj.Key;
+                    if (!string.IsNullOrEmpty(Prefix))
+                        displayName = obj.Key[Prefix.Length..];
+                    var capturedKey = obj.Key;
+                    var capturedSize = obj.Size;
+
+                    <div class="fb-list-row" @onclick="() => OpenPreview(capturedKey, capturedSize)">
+                        <div class="fb-col-icon">
+                            @if (IsImage(displayName))
+                            {
+                                <img class="fb-thumbnail" src="/api/files/preview/@Bucket/@capturedKey" alt="" loading="lazy" />
+                            }
+                            else
+                            {
+                                <i class="bi @GetFileIcon(displayName)"></i>
+                            }
+                        </div>
+                        <div class="fb-col-name">@displayName</div>
+                        <div class="fb-col-size">@FormatBytes(obj.Size)</div>
+                        <div class="fb-col-modified">@obj.LastModified.LocalDateTime.ToString("MMM d, yyyy HH:mm")</div>
+                        <div class="fb-col-actions">
+                            <button class="btn-se-icon" title="Versions"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => OpenVersions(capturedKey)">
+                                <i class="bi bi-clock-history"></i>
+                            </button>
+                            <button class="btn-se-icon" title="Info"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => OpenMetadata(capturedKey)">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                            <a class="btn-se-icon" href="/api/files/download/@Bucket/@obj.Key" title="Download"
+                               @onclick:stopPropagation="true">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            <button class="btn-se-icon" title="Delete"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => DeleteObject(capturedKey)">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@* Preview overlay *@
+@if (previewKey is not null)
+{
+    <FilePreview Bucket="@Bucket" Key="@previewKey" Size="@previewSize"
+                 OnClose="ClosePreview" />
+}
+
+@* Metadata dialog *@
+@if (metadataKey is not null)
+{
+    <MetadataDialog Bucket="@Bucket" Key="@metadataKey"
+                    OnClose="CloseMetadata" OnSaved="LoadObjects" />
+}
+
+@* Version panel *@
+@if (versionKey is not null)
+{
+    <div class="fb-modal-backdrop" @onclick="CloseVersions"></div>
+    <div class="fb-modal" style="width: 560px;" @onclick:stopPropagation>
+        <div class="fb-modal-header">
+            <span>Versions – @Path.GetFileName(versionKey)</span>
+            <button class="btn-se-icon" @onclick="CloseVersions"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="fb-modal-body" style="max-height: 60vh; overflow-y: auto;">
+            @if (versionLoading)
+            {
+                <div style="text-align: center; padding: 20px;">
+                    <div class="spinner-se spinner-se-lg" role="status"></div>
+                </div>
+            }
+            else if (versions.Count == 0)
+            {
+                <p style="color: var(--se-text-muted);">No version history</p>
+            }
+            else
+            {
+                @foreach (var v in versions)
+                {
+                    <div class="version-row @(v.IsCurrent ? "version-current" : "")">
+                        <div class="version-info">
+                            <span class="version-id">@v.VersionId</span>
+                            @if (v.IsCurrent) { <span class="version-badge">Current</span> }
+                            @if (v.IsDeleteMarker) { <span class="version-badge version-badge-del">Deleted</span> }
+                            <span class="version-meta">@v.LastModified.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss") · @FormatBytes(v.Size)</span>
+                        </div>
+                        <div class="version-actions">
+                            @if (!v.IsCurrent && !v.IsDeleteMarker)
+                            {
+                                <a class="btn-se-icon" href="/api/files/download/@Bucket/@versionKey?versionId=@v.VersionId" title="Download version"
+                                   @onclick:stopPropagation="true">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                <button class="btn-se-icon" title="Restore this version"
+                                        @onclick="() => RestoreVersion(v.VersionId)">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                            }
+                            @if (!v.IsCurrent)
+                            {
+                                <button class="btn-se-icon" title="Delete version"
+                                        @onclick="() => DeleteVersion(v.VersionId)">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@* Upload overwrite confirmation *@
+@if (showOverwriteConfirm)
+{
+    <div class="fb-modal-backdrop" @onclick="CancelOverwrite"></div>
+    <div class="fb-modal" @onclick:stopPropagation>
+        <div class="fb-modal-header">
+            <span>File already exists</span>
+            <button class="btn-se-icon" @onclick="CancelOverwrite"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="fb-modal-body">
+            <p>The following files already exist in this location:</p>
+            <ul style="max-height: 200px; overflow-y: auto; font-size: 0.85rem; margin: 8px 0;">
+                @foreach (var name in overwriteFileNames)
+                {
+                    <li><strong>@name</strong></li>
+                }
+            </ul>
+            <p>Uploading will create new versions of these files. Continue?</p>
+        </div>
+        <div class="fb-modal-footer">
+            <button class="btn-se-ghost" @onclick="CancelOverwrite">Cancel</button>
+            <button class="btn-se-primary" @onclick="ConfirmOverwrite">Upload & Version</button>
+        </div>
+    </div>
+}

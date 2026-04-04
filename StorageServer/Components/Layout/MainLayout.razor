@@ -1,0 +1,37 @@
+@inherits LayoutComponentBase
+@inject IStorageService Storage
+
+<div class="app-shell">
+    <header class="app-header">
+        <div class="header-left">
+            <a class="app-logo" href="/">
+                <i class="bi bi-hdd-network-fill"></i>
+                <span>StorageServer</span>
+            </a>
+        </div>
+        <div class="header-right">
+            <div class="storage-info">
+                <div class="storage-info-text">
+                    <span>@bucketCount buckets</span>
+                    <span class="storage-info-sep">·</span>
+                    <span>@totalObjects objects</span>
+                    <span class="storage-info-sep">·</span>
+                    <span>@FormatBytes(totalSize)</span>
+                </div>
+            </div>
+            <span class="storage-badge">
+                <i class="bi bi-cloud-check"></i> Connected
+            </span>
+        </div>
+    </header>
+
+    <main class="app-main">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

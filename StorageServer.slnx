@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="AGENTS.md" />
+    <File Path="Analyzers.ruleset" />
+    <File Path="CLAUDE.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="StorageServer.sln.DotSettings" />
+  </Folder>
+  <Project Path="StorageServer.Client/StorageServer.Client.csproj" />
+  <Project Path="StorageServer/StorageServer.csproj" Id="5bb4371a-b06f-4bcb-ab04-88d6f9d117ae" />
+</Solution>

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet --version)",
+      "Bash(dotnet --list-sdks)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet add:*)",
+      "Bash(rm -f src/WorkExStorage.Storage/Class1.cs)",
+      "Bash(mkdir -p src/WorkExStorage.Storage/Models src/WorkExStorage.Storage/Exceptions)",
+      "Bash(dotnet build:*)",
+      "Bash(ls \"D:/GitHub/Work-Ex-Storage/\"*.sln)",
+      "Bash(dotnet run:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:5020/)",
+      "Bash(dotnet tool:*)",
+      "Bash(libman init:*)",
+      "Bash(libman install:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5020/)",
+      "Bash(mkdir -p css)",
+      "Bash(mv app.css css/)",
+      "Bash(taskkill /F /IM dotnet.exe)",
+      "Bash(curl -s http://localhost:5020/browse/test)"
+    ]
+  }
+}

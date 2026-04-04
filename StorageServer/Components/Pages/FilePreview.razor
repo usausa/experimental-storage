@@ -1,0 +1,76 @@
+@inject IStorageService Storage
+
+<div class="fp-backdrop" @onclick="OnClose"></div>
+<div class="fp-panel" @onclick:stopPropagation>
+    <div class="fp-header">
+        <div class="fp-header-info">
+            <i class="bi @IconCss"></i>
+            <span class="fp-filename">@FileName</span>
+            <span class="fp-filesize">@FormattedSize</span>
+        </div>
+        <div class="fp-header-actions">
+            <a class="btn-se-icon" href="@DownloadUrl" target="_blank" title="Download">
+                <i class="bi bi-download"></i>
+            </a>
+            <button class="btn-se-icon" @onclick="OnClose" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+    <div class="fp-body">
+        @if (IsImageFile)
+        {
+            <div class="fp-center">
+                <img src="@PreviewUrl" alt="@FileName" class="fp-image" />
+            </div>
+        }
+        else if (IsVideoFile)
+        {
+            <div class="fp-center">
+                <video controls class="fp-video" autoplay>
+                    <source src="@PreviewUrl" type="@ContentType" />
+                </video>
+            </div>
+        }
+        else if (IsAudioFile)
+        {
+            <div class="fp-center fp-audio-wrap">
+                <div class="fp-audio-icon">
+                    <i class="bi bi-music-note-beamed"></i>
+                </div>
+                <div class="fp-audio-name">@FileName</div>
+                <audio controls class="fp-audio" autoplay>
+                    <source src="@PreviewUrl" type="@ContentType" />
+                </audio>
+            </div>
+        }
+        else if (IsPdfFile)
+        {
+            <iframe src="@PreviewUrl" class="fp-pdf"></iframe>
+        }
+        else if (IsTextFile)
+        {
+            <div class="fp-text-wrap">
+                @if (textContent is null)
+                {
+                    <div class="fp-center">
+                        <div class="spinner-se spinner-se-lg" role="status"></div>
+                    </div>
+                }
+                else
+                {
+                    <pre class="fp-text-content">@textContent</pre>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="fp-center">
+                <div style="text-align: center; color: var(--se-text-muted);">
+                    <i class="bi bi-file-earmark" style="font-size: 3rem;"></i>
+                    <p>Preview not available for this file type.</p>
+                </div>
+            </div>
+        }
+    </div>
+</div>
