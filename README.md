@@ -13,7 +13,7 @@ Blazor Server management UI.
 | `/` | Dashboard — bucket list, create, delete, tags |
 | `/browse/{bucket}` | File browser — upload, delete, preview, metadata, versioning |
 
-![Web UI](Document/webui.jpg)
+![Web UI](Document/webui.png)
 
 ## S3 API Compatibility
 
