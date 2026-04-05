@@ -1,7 +1,7 @@
 # Storage Server
 
-S3-compatible local object storage server built with ASP.NET Core (.NET 10) and Blazor Server.
-Provides an S3-compatible REST API and a web management UI.
+S3-compatible local object storage server built with ASP.NET Core (.NET 10) and Blazor Server.  
+Provides an S3-compatible REST API and a web management UI.  
 Designed for development and testing — point your AWS SDK at this server instead of AWS S3.
 
 ## Web UI
@@ -17,7 +17,7 @@ Blazor Server management UI.
 
 ## S3 API Compatibility
 
-**Legend:** ✅ Supported · ⚠️ Stub · ❌ Not supported
+**Legend:** ✅ Supported ⚠️ Stub ❌ Not supported
 
 > **⚠️ Stub** — the request is accepted and returns a success response, but no data is stored or enforced.
 
