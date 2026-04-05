@@ -8,9 +8,6 @@ using StorageServer.Storage.Models;
 
 public partial class Dashboard
 {
-    [Inject]
-    public IStorageService Storage { get; set; } = default!;
-
     private sealed record BucketRow(BucketInfo Info, BucketStats? Stats);
 
     private List<BucketRow> buckets = [];
@@ -29,10 +26,25 @@ public partial class Dashboard
     private string? tagsError;
     private List<KeyValuePair<string, string>> editBucketTags = [];
 
+    //--------------------------------------------------------------------------------
+    // Parameter
+    //--------------------------------------------------------------------------------
+
+    [Inject]
+    public IStorageService Storage { get; set; } = default!;
+
+    //--------------------------------------------------------------------------------
+    // Lifecycle
+    //--------------------------------------------------------------------------------
+
     protected override Task OnInitializedAsync()
     {
         return LoadBuckets();
     }
+
+    //--------------------------------------------------------------------------------
+    // Load
+    //--------------------------------------------------------------------------------
 
     private async Task LoadBuckets()
     {
@@ -68,6 +80,10 @@ public partial class Dashboard
             loading = false;
         }
     }
+
+    //--------------------------------------------------------------------------------
+    // Action
+    //--------------------------------------------------------------------------------
 
     private void ShowCreateDialog()
     {
@@ -130,7 +146,9 @@ public partial class Dashboard
         }
     }
 
-    // ---- Bucket Tags ----
+    //--------------------------------------------------------------------------------
+    // Tag
+    //--------------------------------------------------------------------------------
 
     private async Task OpenBucketTags(string name)
     {
@@ -141,7 +159,7 @@ public partial class Dashboard
         try
         {
             var tags = await Storage.GetBucketTagsAsync(name);
-            editBucketTags = tags.Select(kv => new KeyValuePair<string, string>(kv.Key, kv.Value)).ToList();
+            editBucketTags = tags.Select(static x => new KeyValuePair<string, string>(x.Key, x.Value)).ToList();
         }
         catch (StorageException ex)
         {
@@ -184,8 +202,8 @@ public partial class Dashboard
         try
         {
             var tags = editBucketTags
-                .Where(kv => !String.IsNullOrWhiteSpace(kv.Key))
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
+                .Where(static x => !String.IsNullOrWhiteSpace(x.Key))
+                .ToDictionary(static x => x.Key, static x => x.Value);
             await Storage.PutBucketTagsAsync(tagsBucketName, tags);
             tagsBucketName = null;
         }

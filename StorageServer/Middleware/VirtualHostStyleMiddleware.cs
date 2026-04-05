@@ -1,14 +1,10 @@
 namespace StorageServer.Middleware;
 
-/// <summary>
-/// Rewrites incoming S3 requests to internal /storage/* paths.
-///
-/// Supported access patterns:
-///   1. Virtual-hosted style: {bucket}.s3.localhost/{key} → /storage/{bucket}/{key}
-///   2. Path style on s3.localhost: s3.localhost/{bucket}/{key} → /storage/{bucket}/{key}
-///   3. Path style on localhost (ForcePathStyle=true):
-///      localhost:5280/{bucket}/{key} → /storage/{bucket}/{key}
-/// </summary>
+// Rewrites incoming S3 requests to internal /storage/* paths.
+// Supported access patterns:
+//   1. Virtual-hosted style: {bucket}.s3.localhost/{key} → /storage/{bucket}/{key}
+//   2. Path style on s3.localhost: s3.localhost/{bucket}/{key} → /storage/{bucket}/{key}
+//   3. Path style on localhost (ForcePathStyle=true): localhost/{bucket}/{key} → /storage/{bucket}/{key}
 public class VirtualHostStyleMiddleware(RequestDelegate next, IConfiguration configuration)
 {
     private readonly string baseHostname = configuration.GetValue<string>("S3:BaseHostname") ?? "s3.localhost";

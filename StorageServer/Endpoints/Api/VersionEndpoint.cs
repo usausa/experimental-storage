@@ -4,6 +4,10 @@ using StorageServer.Storage;
 
 public static class VersionEndpoint
 {
+    //--------------------------------------------------------------------------------
+    // Mapping
+    //--------------------------------------------------------------------------------
+
     public static void MapVersionEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/versions");
@@ -13,7 +17,11 @@ public static class VersionEndpoint
         group.MapDelete("/{bucket}/{**key}", HandleDelete);
     }
 
-    private static async Task<IResult> HandleListOrGet(
+    //--------------------------------------------------------------------------------
+    // Handler
+    //--------------------------------------------------------------------------------
+
+    private static async ValueTask<IResult> HandleListOrGet(
         HttpContext context,
         string bucket,
         string key,
@@ -32,7 +40,7 @@ public static class VersionEndpoint
         return Results.Ok(new { key, versions });
     }
 
-    private static async Task<IResult> HandleRestore(
+    private static async ValueTask<IResult> HandleRestore(
         string bucket,
         string key,
         string? versionId,
@@ -53,15 +61,22 @@ public static class VersionEndpoint
         return Results.Ok(new { restored = true, versionId });
     }
 
-    private static async Task<IResult> HandleDelete(
+    private static async ValueTask<IResult> HandleDelete(
         string bucket,
         string key,
         string? versionId,
+        string? purge,
         IStorageService storage)
     {
+        if (purge is not null)
+        {
+            await storage.PurgeObjectAsync(bucket, key);
+            return Results.Ok(new { purged = true });
+        }
+
         if (versionId is null)
         {
-            return Results.BadRequest(new { error = "versionId query parameter is required" });
+            return Results.BadRequest(new { error = "versionId or purge query parameter is required" });
         }
 
         await storage.DeleteVersionAsync(bucket, key, versionId);

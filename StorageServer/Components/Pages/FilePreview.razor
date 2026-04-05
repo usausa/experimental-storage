@@ -5,6 +5,10 @@
             <i class="bi @IconCss"></i>
             <span class="fp-filename">@FileName</span>
             <span class="fp-filesize">@FormattedSize</span>
+            @if (VersionId is not null)
+            {
+                <span class="fp-version-badge">Historical version</span>
+            }
         </div>
         <div class="fp-header-actions">
             <a class="btn-se-icon" href="@DownloadUrl" target="_blank" title="Download">
@@ -64,8 +68,8 @@
         else
         {
             <div class="fp-center">
-                <div style="text-align: center; color: var(--se-text-muted);">
-                    <i class="bi bi-file-earmark" style="font-size: 3rem;"></i>
+                <div class="fp-no-preview">
+                    <i class="bi bi-file-earmark fp-no-preview-icon"></i>
                     <p>Preview not available for this file type.</p>
                 </div>
             </div>

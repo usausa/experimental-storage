@@ -1,5 +1,8 @@
+#pragma warning disable CA2234
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 
 using Amazon.Runtime;
 using Amazon.S3;
@@ -7,6 +10,9 @@ using Amazon.S3.Model;
 
 const string serviceUrl = "http://localhost:5280";
 const string bucketName = "test-bucket";
+
+using var httpClient = new HttpClient();
+httpClient.BaseAddress = new Uri(serviceUrl);
 
 var config = new AmazonS3Config
 {
@@ -427,7 +433,166 @@ await client.DeleteCORSConfigurationAsync(
     new DeleteCORSConfigurationRequest { BucketName = bucketName });
 Console.WriteLine("  CORS configuration deleted");
 
-// ── 17. DeleteObjects (bulk delete) ─────────────────────────────
+// ── 18. Version Restore ─────────────────────────────────────────
+Console.WriteLine("\n=== Version Restore ===");
+const string verKey = "versioned-doc.txt";
+
+// ── 18a. Single-version delete and restore ──────────────────────
+Console.WriteLine("  -- Single-version delete + restore --");
+await client.PutObjectAsync(new PutObjectRequest
+{
+    BucketName = bucketName,
+    Key = verKey,
+    ContentBody = "Single version content"
+});
+Console.WriteLine("  Uploaded single v1");
+
+await client.DeleteObjectAsync(bucketName, verKey);
+Console.WriteLine("  Soft-deleted (single version)");
+
+// Verify not accessible
+try
+{
+    await client.GetObjectAsync(bucketName, verKey);
+    Console.WriteLine("  FAIL: expected 404 after soft delete");
+}
+catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+{
+    Console.WriteLine("  After soft delete: 404 confirmed [OK]");
+}
+
+// Version history should have archived data; delete markers are hidden from the API
+var sv = await httpClient.GetFromJsonAsync<JsonElement>($"/api/versions/{bucketName}/{verKey}");
+var svList = sv.GetProperty("versions").EnumerateArray().ToList();
+var svHasData = svList.Any(v => !v.GetProperty("isDeleteMarker").GetBoolean());
+var svHasMarker = svList.Any(v => v.GetProperty("isDeleteMarker").GetBoolean());
+Console.WriteLine($"  Has restorable version: {svHasData} [{(svHasData ? "OK" : "FAIL")}]");
+Console.WriteLine($"  Delete marker hidden from API: {!svHasMarker} [{(!svHasMarker ? "OK" : "FAIL")}]");
+
+// Restore
+var svEntry = svList.FirstOrDefault(v => !v.GetProperty("isDeleteMarker").GetBoolean());
+if (svEntry.ValueKind != JsonValueKind.Undefined)
+{
+    var svId = svEntry.GetProperty("versionId").GetString()!;
+    var svRestore = await httpClient.PostAsync(
+        $"/api/versions/{bucketName}/{Uri.EscapeDataString(verKey)}?versionId={Uri.EscapeDataString(svId)}", null);
+    Console.WriteLine($"  Restore single-version: {(svRestore.IsSuccessStatusCode ? "OK" : "FAIL")}");
+
+    var svGet = await client.GetObjectAsync(bucketName, verKey);
+    using var svReader = new StreamReader(svGet.ResponseStream);
+    var svContent = await svReader.ReadToEndAsync();
+    Console.WriteLine($"  Restored content: \"{svContent}\" [{(svContent == "Single version content" ? "OK" : "FAIL")}]");
+}
+
+// Cleanup for next sub-test
+await client.DeleteObjectAsync(bucketName, verKey);
+var purgeResp0 = await httpClient.DeleteAsync(
+    $"/api/versions/{bucketName}/{Uri.EscapeDataString(verKey)}?purge=true");
+Console.WriteLine($"  Cleanup purge: {(purgeResp0.IsSuccessStatusCode ? "OK" : "FAIL")}");
+
+// ── 18b. Multi-version restore ──────────────────────────────────
+Console.WriteLine("  -- Multi-version restore --");
+// Upload v1
+await client.PutObjectAsync(new PutObjectRequest
+{
+    BucketName = bucketName,
+    Key = verKey,
+    ContentBody = "Version 1 content"
+});
+Console.WriteLine("  Uploaded v1");
+
+// Upload v2 (overwrites → creates version)
+await client.PutObjectAsync(new PutObjectRequest
+{
+    BucketName = bucketName,
+    Key = verKey,
+    ContentBody = "Version 2 content"
+});
+Console.WriteLine("  Uploaded v2");
+
+// Verify current is v2
+var v2Get = await client.GetObjectAsync(bucketName, verKey);
+using (var reader = new StreamReader(v2Get.ResponseStream))
+{
+    var content = await reader.ReadToEndAsync();
+    Console.WriteLine($"  Current content: \"{content}\" [{(content == "Version 2 content" ? "OK" : "FAIL")}]");
+}
+
+// List versions
+var versionsDoc = await httpClient.GetFromJsonAsync<JsonElement>($"/api/versions/{bucketName}/{verKey}");
+var versionsList = versionsDoc.GetProperty("versions").EnumerateArray().ToList();
+Console.WriteLine($"  Version count: {versionsList.Count} (expected 2)");
+var v1Entry = versionsList.FirstOrDefault(v => !v.GetProperty("isCurrent").GetBoolean() && !v.GetProperty("isDeleteMarker").GetBoolean());
+var v1Id = v1Entry.ValueKind != JsonValueKind.Undefined ? v1Entry.GetProperty("versionId").GetString()! : null;
+Console.WriteLine($"  v1 versionId: {v1Id ?? "(not found)"}");
+
+// Restore v1
+if (v1Id is not null)
+{
+    var restoreResp = await httpClient.PostAsync(
+        $"/api/versions/{bucketName}/{Uri.EscapeDataString(verKey)}?versionId={Uri.EscapeDataString(v1Id)}", null);
+    Console.WriteLine($"  Restore v1: {(restoreResp.IsSuccessStatusCode ? "OK" : "FAIL")}");
+
+    var restoredGet = await client.GetObjectAsync(bucketName, verKey);
+    using var reader = new StreamReader(restoredGet.ResponseStream);
+    var restoredContent = await reader.ReadToEndAsync();
+    Console.WriteLine($"  Restored content: \"{restoredContent}\" [{(restoredContent == "Version 1 content" ? "OK" : "FAIL")}]");
+
+    // After restore: v1 is current (original versionId preserved), v2 is in history - no duplicates
+    var versionsAfterRestore = await httpClient.GetFromJsonAsync<JsonElement>($"/api/versions/{bucketName}/{verKey}");
+    var versionsAfterRestoreList = versionsAfterRestore.GetProperty("versions").EnumerateArray().ToList();
+    var hasNoDuplicate = versionsAfterRestoreList.Count(v => !v.GetProperty("isCurrent").GetBoolean()) == 1;
+    Console.WriteLine($"  No duplicate entries (v2 only in history): {hasNoDuplicate} [{(hasNoDuplicate ? "OK" : "FAIL")}]");
+}
+
+// Soft delete
+await client.DeleteObjectAsync(bucketName, verKey);
+Console.WriteLine("  File soft-deleted");
+
+// Verify not accessible after soft delete
+try
+{
+    await client.GetObjectAsync(bucketName, verKey);
+    Console.WriteLine("  FAIL: expected 404 after soft delete");
+}
+catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+{
+    Console.WriteLine("  After soft delete: 404 confirmed [OK]");
+}
+
+// Version list should not include delete markers; restorable versions remain
+var versionsAfterDelete = await httpClient.GetFromJsonAsync<JsonElement>($"/api/versions/{bucketName}/{verKey}");
+var versionsAfterList = versionsAfterDelete.GetProperty("versions").EnumerateArray().ToList();
+var hasDeleteMarker = versionsAfterList.Any(v => v.GetProperty("isDeleteMarker").GetBoolean());
+Console.WriteLine($"  Delete marker hidden from API: {!hasDeleteMarker} [{(!hasDeleteMarker ? "OK" : "FAIL")}]");
+var hasRestorable = versionsAfterList.Any(v => !v.GetProperty("isCurrent").GetBoolean());
+Console.WriteLine($"  Has restorable version: {hasRestorable} [{(hasRestorable ? "OK" : "FAIL")}]");
+
+// Restore from version before deletion
+var restorableEntry = versionsAfterList.FirstOrDefault(v => !v.GetProperty("isCurrent").GetBoolean());
+if (restorableEntry.ValueKind != JsonValueKind.Undefined)
+{
+    var restorableId = restorableEntry.GetProperty("versionId").GetString()!;
+    var restoreAfterDeleteResp = await httpClient.PostAsync(
+        $"/api/versions/{bucketName}/{Uri.EscapeDataString(verKey)}?versionId={Uri.EscapeDataString(restorableId)}", null);
+    Console.WriteLine($"  Restore after soft delete: {(restoreAfterDeleteResp.IsSuccessStatusCode ? "OK" : "FAIL")}");
+
+    var finalGet = await client.GetObjectAsync(bucketName, verKey);
+    using var reader2 = new StreamReader(finalGet.ResponseStream);
+    Console.WriteLine($"  Final restored content: \"{await reader2.ReadToEndAsync()}\"");
+}
+
+// Purge (Delete Permanently)
+var purgeResp = await httpClient.DeleteAsync(
+    $"/api/versions/{bucketName}/{Uri.EscapeDataString(verKey)}?purge=true");
+Console.WriteLine($"  Purge (delete permanently): {(purgeResp.IsSuccessStatusCode ? "OK" : "FAIL")}");
+
+// Verify version history is gone after purge
+var versionsAfterPurge = await httpClient.GetFromJsonAsync<JsonElement>($"/api/versions/{bucketName}/{verKey}");
+var versionsAfterPurgeList = versionsAfterPurge.GetProperty("versions").EnumerateArray().ToList();
+Console.WriteLine($"  Version count after purge: {versionsAfterPurgeList.Count} (expected 0) [{(versionsAfterPurgeList.Count == 0 ? "OK" : "FAIL")}]");
+
+// ── 19. DeleteObjects (bulk delete) ─────────────────────────────
 Console.WriteLine("\n=== Bulk Delete ===");
 var allObjects = await client.ListObjectsV2Async(
     new ListObjectsV2Request { BucketName = bucketName });

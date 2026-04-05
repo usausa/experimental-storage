@@ -7,4 +7,5 @@ public sealed record ObjectSummary
     public DateTimeOffset LastModified { get; init; }
     public required string ETag { get; init; }
     public string StorageClass { get; init; } = "STANDARD";
+    public bool IsDeleted { get; init; }
 }

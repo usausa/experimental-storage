@@ -9,21 +9,6 @@ using StorageServer.Storage.Models;
 
 public partial class FileBrowser : IAsyncDisposable
 {
-    [Inject]
-    public IStorageService Storage { get; set; } = default!;
-
-    [Inject]
-    public NavigationManager Nav { get; set; } = default!;
-
-    [Inject]
-    public IJSRuntime JS { get; set; } = default!;
-
-    [Parameter]
-    public string Bucket { get; set; } = string.Empty;
-
-    [Parameter]
-    public string? Prefix { get; set; }
-
     private List<string> directories = [];
     private List<ObjectSummary> objects = [];
     private bool loading = true;
@@ -40,6 +25,7 @@ public partial class FileBrowser : IAsyncDisposable
     private int uploadCompletedFiles;
     private long uploadTotalBytes;
     private long uploadCompletedBytes;
+    private string uploadCurrentFileName = string.Empty;
     private int UploadPercent => uploadTotalBytes > 0 ? (int)(100.0 * uploadCompletedBytes / uploadTotalBytes) : 0;
 
     // JS interop for drag & drop
@@ -51,6 +37,7 @@ public partial class FileBrowser : IAsyncDisposable
     // Preview & metadata & versions
     private string? previewKey;
     private long previewSize;
+    private string? previewVersionId;
     private string? metadataKey;
     private string? versionKey;
     private List<VersionInfo> versions = [];
@@ -61,18 +48,65 @@ public partial class FileBrowser : IAsyncDisposable
     private List<string> overwriteFileNames = [];
     private TaskCompletionSource<bool>? overwriteTcs;
 
+    // Delete confirmation
+    private enum DeleteChoice
+    {
+        None,
+        Soft,
+        Hard
+    }
+    private bool showDeleteConfirm;
+    private string deleteDisplayName = string.Empty;
+    private bool deleteIsFolder;
+    private bool deleteShowSoftOption = true;
+    private TaskCompletionSource<DeleteChoice>? deleteTcs;
+
     private IEnumerable<ObjectSummary> SortedObjects => sortBy switch
     {
-        "size" => sortAsc ? objects.OrderBy(o => o.Size) : objects.OrderByDescending(o => o.Size),
-        "modified" => sortAsc ? objects.OrderBy(o => o.LastModified) : objects.OrderByDescending(o => o.LastModified),
-        _ => sortAsc ? objects.OrderBy(o => o.Key) : objects.OrderByDescending(o => o.Key)
+        "size" => sortAsc ? objects.OrderBy(static x => x.Size) : objects.OrderByDescending(static x => x.Size),
+        "modified" => sortAsc ? objects.OrderBy(static x => x.LastModified) : objects.OrderByDescending(static x => x.LastModified),
+        _ => sortAsc ? objects.OrderBy(static x => x.Key) : objects.OrderByDescending(static x => x.Key)
     };
+
+    //--------------------------------------------------------------------------------
+    // Parameter
+    //--------------------------------------------------------------------------------
+
+    [Inject]
+    public IStorageService Storage { get; set; } = default!;
+
+    [Inject]
+    public NavigationManager Nav { get; set; } = default!;
+
+    [Inject]
+    public IJSRuntime JS { get; set; } = default!;
+
+    [Parameter]
+    public string Bucket { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Prefix { get; set; }
+
+    //--------------------------------------------------------------------------------
+    // Lifecycle
+    //--------------------------------------------------------------------------------
 
     public async ValueTask DisposeAsync()
     {
         if (jsModule is not null)
         {
-            await jsModule.DisposeAsync();
+            try
+            {
+                await jsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit disconnected; JS interop is no longer available
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed
+            }
         }
 
         dotNetRef?.Dispose();
@@ -99,6 +133,10 @@ public partial class FileBrowser : IAsyncDisposable
         }
     }
 
+    //--------------------------------------------------------------------------------
+    // Load
+    //--------------------------------------------------------------------------------
+
     private async Task LoadObjects()
     {
         loading = true;
@@ -111,7 +149,17 @@ public partial class FileBrowser : IAsyncDisposable
                 Delimiter = "/"
             });
             directories = result.CommonPrefixes.ToList();
-            objects = result.Objects.Where(o => o.Key != Prefix).ToList();
+            objects = result.Objects.Where(x => x.Key != Prefix).ToList();
+
+            // Include soft-deleted objects at the current prefix level
+            var currentPrefix = Prefix ?? string.Empty;
+            var deleted = await Storage.ListDeletedObjectsAsync(Bucket, currentPrefix.Length > 0 ? currentPrefix : null);
+            var directDeleted = deleted.Where(x =>
+            {
+                var afterPrefix = x.Key[currentPrefix.Length..];
+                return !afterPrefix.Contains('/', StringComparison.Ordinal);
+            });
+            objects = objects.Concat(directDeleted).ToList();
         }
         catch (StorageException ex)
         {
@@ -122,6 +170,10 @@ public partial class FileBrowser : IAsyncDisposable
             loading = false;
         }
     }
+
+    //--------------------------------------------------------------------------------
+    // Navigation
+    //--------------------------------------------------------------------------------
 
     private void NavigateTo(string prefix) => Nav.NavigateTo($"/browse/{Bucket}/{prefix}");
 
@@ -137,6 +189,10 @@ public partial class FileBrowser : IAsyncDisposable
         var parent = lastSlash >= 0 ? trimmed[..(lastSlash + 1)] : string.Empty;
         Nav.NavigateTo(String.IsNullOrEmpty(parent) ? $"/browse/{Bucket}" : $"/browse/{Bucket}/{parent}");
     }
+
+    //--------------------------------------------------------------------------------
+    // Data
+    //--------------------------------------------------------------------------------
 
     private List<(string Name, string Path, bool IsLast)> GetBreadcrumbs()
     {
@@ -155,6 +211,10 @@ public partial class FileBrowser : IAsyncDisposable
 
         return result;
     }
+
+    //--------------------------------------------------------------------------------
+    // Action
+    //--------------------------------------------------------------------------------
 
     private void ToggleSort(string column)
     {
@@ -221,9 +281,23 @@ public partial class FileBrowser : IAsyncDisposable
 
     private async Task DeleteObject(string key)
     {
+        var displayName = String.IsNullOrEmpty(Prefix) ? key : key[Prefix.Length..];
+        var choice = await ConfirmDeleteAsync(displayName, isFolder: false);
+        if (choice == DeleteChoice.None)
+        {
+            return;
+        }
+
         try
         {
-            await Storage.DeleteObjectAsync(Bucket, key);
+            if (choice == DeleteChoice.Hard)
+            {
+                await Storage.PurgeObjectAsync(Bucket, key);
+            }
+            else
+            {
+                await Storage.DeleteObjectAsync(Bucket, key);
+            }
             await LoadObjects();
         }
         catch (StorageException ex)
@@ -234,13 +308,30 @@ public partial class FileBrowser : IAsyncDisposable
 
     private async Task DeletePrefix(string prefix)
     {
+        var dirName = prefix.TrimEnd('/').Split('/').Last();
+        var choice = await ConfirmDeleteAsync(dirName, isFolder: true);
+        if (choice == DeleteChoice.None)
+        {
+            return;
+        }
+
         try
         {
             var result = await Storage.ListObjectsAsync(Bucket, new ListObjectsOptions { Prefix = prefix });
-            var keys = result.Objects.Select(o => o.Key).ToList();
+            var keys = result.Objects.Select(static x => x.Key).ToList();
             if (keys.Count > 0)
             {
-                await Storage.DeleteObjectsAsync(Bucket, keys);
+                if (choice == DeleteChoice.Hard)
+                {
+                    foreach (var key in keys)
+                    {
+                        await Storage.PurgeObjectAsync(Bucket, key);
+                    }
+                }
+                else
+                {
+                    await Storage.DeleteObjectsAsync(Bucket, keys);
+                }
             }
 
             await LoadObjects();
@@ -251,7 +342,9 @@ public partial class FileBrowser : IAsyncDisposable
         }
     }
 
-    // ---- Upload via JS interop ----
+    //--------------------------------------------------------------------------------
+    // Upload
+    //--------------------------------------------------------------------------------
 
     private async Task TriggerFileInput()
     {
@@ -277,17 +370,19 @@ public partial class FileBrowser : IAsyncDisposable
         uploadTotalBytes = totalBytes;
         uploadCompletedFiles = 0;
         uploadCompletedBytes = 0;
+        uploadCurrentFileName = string.Empty;
         StateHasChanged();
         return Task.CompletedTask;
     }
 
     [JSInvokable]
-    public Task OnUploadByteProgress(int completedFiles, int totalFiles, long completedBytes, long totalBytes)
+    public Task OnUploadByteProgress(int completedFiles, int totalFiles, long completedBytes, long totalBytes, string currentFileName)
     {
         uploadCompletedFiles = completedFiles;
         uploadTotalFiles = totalFiles;
         uploadCompletedBytes = completedBytes;
         uploadTotalBytes = totalBytes;
+        uploadCurrentFileName = currentFileName;
         StateHasChanged();
         return Task.CompletedTask;
     }
@@ -308,7 +403,9 @@ public partial class FileBrowser : IAsyncDisposable
         StateHasChanged();
     }
 
-    // ---- Preview & Metadata ----
+    //--------------------------------------------------------------------------------
+    // Preview
+    //--------------------------------------------------------------------------------
 
     private void OpenPreview(string key, long size)
     {
@@ -316,12 +413,49 @@ public partial class FileBrowser : IAsyncDisposable
         previewSize = size;
     }
 
-    private void ClosePreview() => previewKey = null;
+    private void OpenPreview(string key, long size, string? versionId)
+    {
+        previewKey = key;
+        previewSize = size;
+        previewVersionId = versionId;
+    }
+
+    private void ClosePreview()
+    {
+        previewKey = null;
+        previewVersionId = null;
+    }
 
     private void OpenMetadata(string key) => metadataKey = key;
     private void CloseMetadata() => metadataKey = null;
 
-    // ---- Versions ----
+    //--------------------------------------------------------------------------------
+    // Deleted object
+    //--------------------------------------------------------------------------------
+
+    private async Task PurgeDeletedObject(string key)
+    {
+        var displayName = String.IsNullOrEmpty(Prefix) ? key : key[Prefix.Length..];
+        var choice = await ConfirmDeleteAsync(displayName, isFolder: false, showSoftOption: false);
+        if (choice != DeleteChoice.Hard)
+        {
+            return;
+        }
+
+        try
+        {
+            await Storage.PurgeObjectAsync(Bucket, key);
+            await LoadObjects();
+        }
+        catch (StorageException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    // Versions
+    //--------------------------------------------------------------------------------
 
     private async Task OpenVersions(string key)
     {
@@ -382,14 +516,16 @@ public partial class FileBrowser : IAsyncDisposable
         }
     }
 
-    // ---- Overwrite confirmation ----
+    //--------------------------------------------------------------------------------
+    // Overwrite confirmation
+    //--------------------------------------------------------------------------------
 
     [JSInvokable]
     public async Task<bool> CheckDuplicates(string[] fileNames)
     {
-        var existingKeys = objects.Select(o =>
+        var existingKeys = objects.Select(x =>
         {
-            var key = o.Key;
+            var key = x.Key;
             if (!String.IsNullOrEmpty(Prefix))
             {
                 key = key[Prefix.Length..];
@@ -422,5 +558,34 @@ public partial class FileBrowser : IAsyncDisposable
     {
         showOverwriteConfirm = false;
         overwriteTcs?.TrySetResult(false);
+    }
+
+    private Task<DeleteChoice> ConfirmDeleteAsync(string displayName, bool isFolder, bool showSoftOption = true)
+    {
+        deleteDisplayName = displayName;
+        deleteIsFolder = isFolder;
+        deleteShowSoftOption = showSoftOption;
+        showDeleteConfirm = true;
+        deleteTcs = new TaskCompletionSource<DeleteChoice>();
+        StateHasChanged();
+        return deleteTcs.Task;
+    }
+
+    private void ConfirmSoftDeleteAction()
+    {
+        showDeleteConfirm = false;
+        deleteTcs?.TrySetResult(DeleteChoice.Soft);
+    }
+
+    private void ConfirmHardDeleteAction()
+    {
+        showDeleteConfirm = false;
+        deleteTcs?.TrySetResult(DeleteChoice.Hard);
+    }
+
+    private void CancelDeleteAction()
+    {
+        showDeleteConfirm = false;
+        deleteTcs?.TrySetResult(DeleteChoice.None);
     }
 }

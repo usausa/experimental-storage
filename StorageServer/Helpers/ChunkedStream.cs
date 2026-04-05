@@ -32,7 +32,6 @@ public sealed class ChunkedStream : Stream
 
     public ChunkedStream(Stream inner)
     {
-        ArgumentNullException.ThrowIfNull(inner);
         this.inner = inner;
         lineBuffer = ArrayPool<byte>.Shared.Rent(LineBufferSize);
     }

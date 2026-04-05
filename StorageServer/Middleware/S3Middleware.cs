@@ -6,10 +6,6 @@ using StorageServer.Consts;
 
 using StorageServer.Storage;
 
-/// <summary>
-/// Unified S3 middleware that handles request-id, CORS, and exception mapping
-/// for all requests under /storage.
-/// </summary>
 public sealed class S3Middleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, IStorageService storageService)
@@ -43,26 +39,6 @@ public sealed class S3Middleware(RequestDelegate next)
         }
     }
 
-    private static IResult ToS3Error(StorageException ex, string requestId)
-    {
-        if (ex is NotModifiedException)
-        {
-            return Results.StatusCode(304);
-        }
-
-        var doc = new XDocument(
-            new XDeclaration("1.0", "UTF-8", null),
-            new XElement(S3Names.Error,
-                new XElement(S3Names.Code, ex.ErrorCode),
-                new XElement(S3Names.Message, ex.Message),
-                new XElement(S3Names.RequestId, requestId)));
-
-        return Results.Content(
-            doc.Declaration + doc.ToString(),
-            "application/xml",
-            statusCode: ex.HttpStatusCode);
-    }
-
     private static async Task ApplyCorsAsync(HttpContext context, IStorageService storageService)
     {
         var origin = context.Request.Headers.Origin.FirstOrDefault();
@@ -86,15 +62,13 @@ public sealed class S3Middleware(RequestDelegate next)
 
             foreach (var rule in corsRules)
             {
-                var originMatch = rule.AllowedOrigins.Any(o =>
-                    o == "*" || String.Equals(o, origin, StringComparison.OrdinalIgnoreCase));
+                var originMatch = rule.AllowedOrigins.Any(x => x == "*" || String.Equals(x, origin, StringComparison.OrdinalIgnoreCase));
                 if (!originMatch)
                 {
                     continue;
                 }
 
-                var methodMatch = rule.AllowedMethods.Any(m =>
-                    m == "*" || String.Equals(m, method, StringComparison.OrdinalIgnoreCase));
+                var methodMatch = rule.AllowedMethods.Any(x => x == "*" || String.Equals(x, method, StringComparison.OrdinalIgnoreCase));
                 if (!methodMatch && !HttpMethods.IsOptions(context.Request.Method))
                 {
                     continue;
@@ -135,5 +109,25 @@ public sealed class S3Middleware(RequestDelegate next)
         {
             // No CORS config
         }
+    }
+
+    private static IResult ToS3Error(StorageException ex, string requestId)
+    {
+        if (ex is NotModifiedException)
+        {
+            return Results.StatusCode(304);
+        }
+
+        var doc = new XDocument(
+            new XDeclaration("1.0", "UTF-8", null),
+            new XElement(S3Names.Error,
+                new XElement(S3Names.Code, ex.ErrorCode),
+                new XElement(S3Names.Message, ex.Message),
+                new XElement(S3Names.RequestId, requestId)));
+
+        return Results.Content(
+            doc.Declaration + doc.ToString(),
+            "application/xml",
+            statusCode: ex.HttpStatusCode);
     }
 }

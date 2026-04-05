@@ -4,10 +4,10 @@
         <span>Metadata – @FileName</span>
         <button class="btn-se-icon" @onclick="OnClose"><i class="bi bi-x-lg"></i></button>
     </div>
-    <div class="fb-modal-body" style="max-height: 60vh; overflow-y: auto;">
+    <div class="fb-modal-body fb-modal-body-scroll">
         @if (loading)
         {
-            <div style="text-align: center; padding: 20px;">
+            <div class="fb-modal-loading">
                 <div class="spinner-se spinner-se-lg" role="status"></div>
             </div>
         }
@@ -24,14 +24,14 @@
                 <div class="meta-row"><span class="meta-label">ACL</span><span class="meta-value">@metadata.Acl</span></div>
                 @if (metadata.VersionId is not null)
                 {
-                    <div class="meta-row"><span class="meta-label">Version ID</span><span class="meta-value" style="font-family: monospace; font-size: 0.8rem;">@metadata.VersionId</span></div>
+                    <div class="meta-row"><span class="meta-label">Version ID</span><span class="meta-value meta-value-mono">@metadata.VersionId</span></div>
                 }
             </div>
 
             <div class="meta-section">
                 <div class="meta-section-header">
                     <h4 class="meta-section-title">User Metadata</h4>
-                    <button class="btn-se-ghost" style="padding: 2px 8px; font-size: 0.75rem;" @onclick="AddUserMeta">
+                    <button class="btn-se-ghost btn-se-xs" @onclick="AddUserMeta">
                         <i class="bi bi-plus"></i> Add
                     </button>
                 </div>
@@ -43,13 +43,13 @@
                 {
                     @for (var i = 0; i < editUserMeta.Count; i++)
                     {
-                        var idx = i;
+                        var index = i;
                         <div class="meta-edit-row">
-                            <input type="text" class="meta-input" placeholder="Key" value="@editUserMeta[idx].Key"
-                                   @onchange="e => UpdateUserMetaKey(idx, e)" />
-                            <input type="text" class="meta-input" placeholder="Value" value="@editUserMeta[idx].Value"
-                                   @onchange="e => UpdateUserMetaValue(idx, e)" />
-                            <button class="btn-se-icon" style="width: 28px; height: 28px; font-size: 0.8rem;" @onclick="() => editUserMeta.RemoveAt(idx)">
+                            <input type="text" class="meta-input" placeholder="Key" value="@editUserMeta[index].Key"
+                                   @onchange="e => UpdateUserMetaKey(index, e)" />
+                            <input type="text" class="meta-input" placeholder="Value" value="@editUserMeta[index].Value"
+                                   @onchange="e => UpdateUserMetaValue(index, e)" />
+                            <button class="btn-se-icon btn-se-icon-sm" @onclick="() => editUserMeta.RemoveAt(index)">
                                 <i class="bi bi-x"></i>
                             </button>
                         </div>
@@ -60,7 +60,7 @@
             <div class="meta-section">
                 <div class="meta-section-header">
                     <h4 class="meta-section-title">Tags</h4>
-                    <button class="btn-se-ghost" style="padding: 2px 8px; font-size: 0.75rem;" @onclick="AddTag">
+                    <button class="btn-se-ghost btn-se-xs" @onclick="AddTag">
                         <i class="bi bi-plus"></i> Add
                     </button>
                 </div>
@@ -72,13 +72,13 @@
                 {
                     @for (var i = 0; i < editTags.Count; i++)
                     {
-                        var idx = i;
+                        var index = i;
                         <div class="meta-edit-row">
-                            <input type="text" class="meta-input" placeholder="Key" value="@editTags[idx].Key"
-                                   @onchange="e => UpdateTagKey(idx, e)" />
-                            <input type="text" class="meta-input" placeholder="Value" value="@editTags[idx].Value"
-                                   @onchange="e => UpdateTagValue(idx, e)" />
-                            <button class="btn-se-icon" style="width: 28px; height: 28px; font-size: 0.8rem;" @onclick="() => editTags.RemoveAt(idx)">
+                            <input type="text" class="meta-input" placeholder="Key" value="@editTags[index].Key"
+                                   @onchange="e => UpdateTagKey(index, e)" />
+                            <input type="text" class="meta-input" placeholder="Value" value="@editTags[index].Value"
+                                   @onchange="e => UpdateTagValue(index, e)" />
+                            <button class="btn-se-icon btn-se-icon-sm" @onclick="() => editTags.RemoveAt(index)">
                                 <i class="bi bi-x"></i>
                             </button>
                         </div>
@@ -88,7 +88,7 @@
 
             @if (saveError is not null)
             {
-                <p class="fb-modal-warn" style="margin-top: 8px;">@saveError</p>
+                <p class="fb-modal-warn">@saveError</p>
             }
         }
     </div>
@@ -97,7 +97,7 @@
         <button class="btn-se-primary" @onclick="SaveChanges" disabled="@saving">
             @if (saving)
             {
-                <div class="spinner-se" role="status" style="width: 0.8rem; height: 0.8rem;"></div>
+                <div class="spinner-se spinner-se-xs" role="status"></div>
             }
             Save
         </button>

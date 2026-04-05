@@ -59,7 +59,184 @@ h1:focus {
     outline: none;
 }
 
-/* ---- Utility text colors ---- */
+/* ============================================
+   Scrollbar
+   ============================================ */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* ============================================
+   Blazor Framework
+   ============================================ */
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+.blazor-error-boundary::after {
+    content: "An error has occurred."
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+/* ============================================
+   Reconnect Modal
+   ============================================ */
+
+.components-reconnect-first-attempt-visible,
+.components-reconnect-repeated-attempt-visible,
+.components-reconnect-failed-visible,
+.components-pause-visible,
+.components-resume-failed-visible,
+.components-rejoining-animation {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-show .components-reconnect-first-attempt-visible,
+#components-reconnect-modal.components-reconnect-show .components-rejoining-animation,
+#components-reconnect-modal.components-reconnect-paused .components-pause-visible,
+#components-reconnect-modal.components-reconnect-resume-failed .components-resume-failed-visible,
+#components-reconnect-modal.components-reconnect-retrying,
+#components-reconnect-modal.components-reconnect-retrying .components-reconnect-repeated-attempt-visible,
+#components-reconnect-modal.components-reconnect-retrying .components-rejoining-animation,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-failed .components-reconnect-failed-visible {
+    display: block;
+}
+
+#components-reconnect-modal {
+    background-color: white;
+    width: 20rem;
+    margin: 20vh auto;
+    padding: 2rem;
+    border: 0;
+    border-radius: 0.5rem;
+    box-shadow: 0 3px 6px 2px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: display 0.5s allow-discrete, overlay 0.5s allow-discrete;
+    animation: components-reconnect-modal-fadeOutOpacity 0.5s both;
+}
+
+#components-reconnect-modal[open] {
+    animation: components-reconnect-modal-slideUp 1.5s cubic-bezier(.05, .89, .25, 1.02) 0.3s,
+               components-reconnect-modal-fadeInOpacity 0.5s ease-in-out 0.3s;
+    animation-fill-mode: both;
+}
+
+#components-reconnect-modal::backdrop {
+    background-color: rgba(0, 0, 0, 0.4);
+    animation: components-reconnect-modal-fadeInOpacity 0.5s ease-in-out;
+    opacity: 1;
+}
+
+@keyframes components-reconnect-modal-slideUp {
+    0% { transform: translateY(30px) scale(0.95); }
+    100% { transform: translateY(0); }
+}
+
+@keyframes components-reconnect-modal-fadeInOpacity {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes components-reconnect-modal-fadeOutOpacity {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.components-reconnect-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+#components-reconnect-modal p {
+    margin: 0;
+    text-align: center;
+}
+
+#components-reconnect-modal button {
+    border: 0;
+    background-color: #6b9ed2;
+    color: white;
+    padding: 4px 24px;
+    border-radius: 4px;
+}
+
+#components-reconnect-modal button:hover {
+    background-color: #3b6ea2;
+}
+
+#components-reconnect-modal button:active {
+    background-color: #6b9ed2;
+}
+
+.components-rejoining-animation {
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+.components-rejoining-animation div {
+    position: absolute;
+    border: 3px solid #0087ff;
+    opacity: 1;
+    border-radius: 50%;
+    animation: components-rejoining-animation 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.components-rejoining-animation div:nth-child(2) {
+    animation-delay: -0.5s;
+}
+
+@keyframes components-rejoining-animation {
+    0% { top: 40px; left: 40px; width: 0; height: 0; opacity: 0; }
+    4.9% { top: 40px; left: 40px; width: 0; height: 0; opacity: 0; }
+    5% { top: 40px; left: 40px; width: 0; height: 0; opacity: 1; }
+    100% { top: 0; left: 0; width: 80px; height: 80px; opacity: 0; }
+}
+
+/* ============================================
+   Common – Typography
+   ============================================ */
 
 .text-warning { color: #f5a623; }
 .text-success { color: var(--se-success); }
@@ -70,7 +247,7 @@ h1:focus {
 .text-muted { color: var(--se-text-muted); }
 
 /* ============================================
-   Buttons
+   Common – Buttons
    ============================================ */
 
 .btn-se-primary {
@@ -114,6 +291,35 @@ h1:focus {
     border-color: #d1d5db;
 }
 
+.btn-se-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 6px;
+    background: var(--se-danger);
+    color: #fff;
+    border: 1px solid var(--se-danger);
+    cursor: pointer;
+}
+
+.btn-se-danger:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+    color: #fff;
+}
+
+.btn-se-sm {
+    padding: 5px 14px;
+}
+
+.btn-se-xs {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+}
+
 .btn-se-icon {
     display: inline-flex;
     align-items: center;
@@ -136,7 +342,15 @@ h1:focus {
     color: var(--se-text);
 }
 
-/* ---- Spinner ---- */
+.btn-se-icon-sm {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+}
+
+/* ============================================
+   Common – Spinner
+   ============================================ */
 
 .spinner-se {
     display: inline-block;
@@ -154,48 +368,18 @@ h1:focus {
     border-width: 3px;
 }
 
+.spinner-se-xs {
+    width: 0.8rem;
+    height: 0.8rem;
+    border-width: 2px;
+}
+
 @keyframes se-spin {
     to { transform: rotate(360deg); }
 }
 
 /* ============================================
-   Blazor error boundary
-   ============================================ */
-
-.blazor-error-boundary {
-    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
-    padding: 1rem 1rem 1rem 3.7rem;
-    color: white;
-}
-
-.blazor-error-boundary::after {
-    content: "An error has occurred."
-}
-
-/* ============================================
-   Scrollbar
-   ============================================ */
-
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
-}
-
-/* ============================================
-   Layout – App shell
+   Individual – Layout (App Shell)
    ============================================ */
 
 .app-shell {
@@ -288,7 +472,7 @@ h1:focus {
 }
 
 /* ============================================
-   Dashboard – Bucket list
+   Individual – Dashboard
    ============================================ */
 
 .dashboard {
@@ -313,6 +497,10 @@ h1:focus {
     border: 1px solid var(--se-border);
     border-radius: var(--se-radius-lg);
     overflow: hidden;
+}
+
+.bucket-table-borderless {
+    border: none;
 }
 
 .bucket-table-header {
@@ -438,7 +626,7 @@ h1:focus {
 }
 
 /* ============================================
-   FileBrowser
+   Individual – FileBrowser
    ============================================ */
 
 .fb {
@@ -552,7 +740,25 @@ a.fb-crumb:hover {
     height: 100%;
     background: var(--se-primary);
     border-radius: 2px;
-    transition: width 300ms ease;
+    transition: width 150ms ease;
+    width: var(--fb-progress, 0%);
+}
+
+.fb-upload-filename {
+    font-size: 0.75rem;
+    color: var(--se-text-muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 1px;
+}
+
+.fb-upload-bytes {
+    font-size: 0.75rem;
+    color: var(--se-text-muted);
+    text-align: right;
+    margin-top: 3px;
 }
 
 /* ---- Error toast ---- */
@@ -578,6 +784,12 @@ a.fb-crumb:hover {
     padding: 8px 24px;
     background: var(--se-primary-light);
     border-bottom: 1px solid var(--se-border);
+}
+
+.fb-new-folder-icon {
+    color: var(--se-primary);
+    font-size: 1.1rem;
+    flex-shrink: 0;
 }
 
 .fb-new-folder-input {
@@ -752,6 +964,26 @@ a.fb-crumb:hover {
     color: var(--se-text-secondary);
 }
 
+.fb-row-deleted {
+    opacity: 0.7;
+    cursor: default;
+    color: var(--se-text-muted);
+}
+
+.fb-row-deleted:hover {
+    background: transparent;
+}
+
+.fb-row-deleted .fb-col-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fb-name-deleted {
+    text-decoration: line-through;
+}
+
 .fb-row-parent .fb-col-name {
     font-weight: 400;
     color: var(--se-text-secondary);
@@ -833,6 +1065,7 @@ a.fb-crumb:hover {
 .fb-modal-warn {
     color: var(--se-danger);
     font-size: 0.8rem;
+    margin-top: 8px;
 }
 
 .fb-modal-footer {
@@ -843,9 +1076,7 @@ a.fb-crumb:hover {
     border-top: 1px solid var(--se-border-light);
 }
 
-/* ============================================
-   Drop Zone overlay
-   ============================================ */
+/* ---- FileBrowser – Drop Zone ---- */
 
 .fb-drop-overlay {
     position: absolute;
@@ -879,7 +1110,7 @@ a.fb-crumb:hover {
 }
 
 /* ============================================
-   FilePreview – Full-screen overlay
+   Individual – FilePreview
    ============================================ */
 
 .fp-backdrop {
@@ -935,6 +1166,28 @@ a.fb-crumb:hover {
 .fp-filesize {
     font-size: 0.8rem;
     color: var(--se-text-muted);
+    flex-shrink: 0;
+}
+
+.fp-no-preview {
+    text-align: center;
+    color: var(--se-text-muted);
+}
+
+.fp-no-preview-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.fp-version-badge {
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--se-warning-light, #fef3c7);
+    color: var(--se-warning, #92400e);
+    border: 1px solid var(--se-warning, #f59e0b);
     flex-shrink: 0;
 }
 
@@ -1028,7 +1281,7 @@ a.fb-crumb:hover {
 }
 
 /* ============================================
-   Metadata Dialog
+   Individual – Metadata Dialog
    ============================================ */
 
 .meta-dialog {
@@ -1082,6 +1335,11 @@ a.fb-crumb:hover {
     word-break: break-all;
 }
 
+.meta-value-mono {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8rem;
+}
+
 .meta-empty {
     font-size: 0.8rem;
     color: var(--se-text-muted);
@@ -1112,150 +1370,7 @@ a.fb-crumb:hover {
 }
 
 /* ============================================
-   Blazor Error UI (from MainLayout)
-   ============================================ */
-
-#blazor-error-ui {
-    color-scheme: light only;
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
-    position: fixed;
-    width: 100%;
-    z-index: 1000;
-}
-
-#blazor-error-ui .dismiss {
-    cursor: pointer;
-    position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
-}
-
-/* ============================================
-   Reconnect Modal
-   ============================================ */
-
-.components-reconnect-first-attempt-visible,
-.components-reconnect-repeated-attempt-visible,
-.components-reconnect-failed-visible,
-.components-pause-visible,
-.components-resume-failed-visible,
-.components-rejoining-animation {
-    display: none;
-}
-
-#components-reconnect-modal.components-reconnect-show .components-reconnect-first-attempt-visible,
-#components-reconnect-modal.components-reconnect-show .components-rejoining-animation,
-#components-reconnect-modal.components-reconnect-paused .components-pause-visible,
-#components-reconnect-modal.components-reconnect-resume-failed .components-resume-failed-visible,
-#components-reconnect-modal.components-reconnect-retrying,
-#components-reconnect-modal.components-reconnect-retrying .components-reconnect-repeated-attempt-visible,
-#components-reconnect-modal.components-reconnect-retrying .components-rejoining-animation,
-#components-reconnect-modal.components-reconnect-failed,
-#components-reconnect-modal.components-reconnect-failed .components-reconnect-failed-visible {
-    display: block;
-}
-
-#components-reconnect-modal {
-    background-color: white;
-    width: 20rem;
-    margin: 20vh auto;
-    padding: 2rem;
-    border: 0;
-    border-radius: 0.5rem;
-    box-shadow: 0 3px 6px 2px rgba(0, 0, 0, 0.3);
-    opacity: 0;
-    transition: display 0.5s allow-discrete, overlay 0.5s allow-discrete;
-    animation: components-reconnect-modal-fadeOutOpacity 0.5s both;
-}
-
-#components-reconnect-modal[open] {
-    animation: components-reconnect-modal-slideUp 1.5s cubic-bezier(.05, .89, .25, 1.02) 0.3s,
-               components-reconnect-modal-fadeInOpacity 0.5s ease-in-out 0.3s;
-    animation-fill-mode: both;
-}
-
-#components-reconnect-modal::backdrop {
-    background-color: rgba(0, 0, 0, 0.4);
-    animation: components-reconnect-modal-fadeInOpacity 0.5s ease-in-out;
-    opacity: 1;
-}
-
-@keyframes components-reconnect-modal-slideUp {
-    0% { transform: translateY(30px) scale(0.95); }
-    100% { transform: translateY(0); }
-}
-
-@keyframes components-reconnect-modal-fadeInOpacity {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
-}
-
-@keyframes components-reconnect-modal-fadeOutOpacity {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
-}
-
-.components-reconnect-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-}
-
-#components-reconnect-modal p {
-    margin: 0;
-    text-align: center;
-}
-
-#components-reconnect-modal button {
-    border: 0;
-    background-color: #6b9ed2;
-    color: white;
-    padding: 4px 24px;
-    border-radius: 4px;
-}
-
-#components-reconnect-modal button:hover {
-    background-color: #3b6ea2;
-}
-
-#components-reconnect-modal button:active {
-    background-color: #6b9ed2;
-}
-
-.components-rejoining-animation {
-    position: relative;
-    width: 80px;
-    height: 80px;
-}
-
-.components-rejoining-animation div {
-    position: absolute;
-    border: 3px solid #0087ff;
-    opacity: 1;
-    border-radius: 50%;
-    animation: components-rejoining-animation 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
-}
-
-.components-rejoining-animation div:nth-child(2) {
-    animation-delay: -0.5s;
-}
-
-@keyframes components-rejoining-animation {
-    0% { top: 40px; left: 40px; width: 0; height: 0; opacity: 0; }
-    4.9% { top: 40px; left: 40px; width: 0; height: 0; opacity: 0; }
-    5% { top: 40px; left: 40px; width: 0; height: 0; opacity: 1; }
-    100% { top: 0; left: 0; width: 80px; height: 80px; opacity: 0; }
-}
-
-/* ============================================
-   Thumbnail in file list
+   FileBrowser – Thumbnail
    ============================================ */
 
 .fb-thumbnail {
@@ -1267,7 +1382,7 @@ a.fb-crumb:hover {
 }
 
 /* ============================================
-   Version Panel
+   FileBrowser – Version Panel
    ============================================ */
 
 .version-row {
@@ -1330,4 +1445,31 @@ a.fb-crumb:hover {
     align-items: center;
     gap: 2px;
     flex-shrink: 0;
+}
+
+/* ---- FileBrowser – Utilities ---- */
+
+.fb-file-input { display: none; }
+
+.fb-icon-bucket { color: var(--se-primary); }
+
+.fb-modal-versions { width: 560px; }
+
+.fb-modal-body-scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.fb-modal-loading {
+    text-align: center;
+    padding: 20px;
+}
+
+.fb-modal-empty { color: var(--se-text-muted); }
+
+.fb-overwrite-list {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    margin: 8px 0;
 }

@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Http.Features;
+
 using StorageServer.Components;
 using StorageServer.Endpoints.Api;
 using StorageServer.Endpoints.S3;
@@ -5,6 +7,16 @@ using StorageServer.Middleware;
 using StorageServer.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Allow large file uploads
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = null;
+});
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = Int64.MaxValue;
+});
 
 // Storage service
 builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
@@ -18,14 +30,14 @@ var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler("/error", createScopeForErrors: true);
 }
 
 // URL rewriting must run before routing
 app.UseMiddleware<VirtualHostStyleMiddleware>();
 app.UseRouting();
 
-// S3 request-id, CORS, and exception handling (unified)
+// S3 request-id, CORS, and exception handling
 app.UseMiddleware<S3Middleware>();
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);

@@ -97,42 +97,10 @@ async function uploadFiles(fileList, dotNetHelper) {
 
     await dotNetHelper.invokeMethodAsync('OnUploadStarted', totalFiles, totalBytes);
 
-    const batchThreshold = 50 * 1024 * 1024;
-    let batch = [];
-    let batchSize = 0;
-
-    for (const { file, relativePath } of fileList) {
-        batch.push({ file, relativePath });
-        batchSize += file.size;
-
-        if (batchSize >= batchThreshold) {
-            const batchBytes = batch.reduce((s, b) => s + b.file.size, 0);
-            await sendBatch(batch, dotNetHelper);
-            completedFiles += batch.length;
-            completedBytes += batchBytes;
-            await dotNetHelper.invokeMethodAsync('OnUploadByteProgress', completedFiles, totalFiles, completedBytes, totalBytes);
-            batch = [];
-            batchSize = 0;
-        }
-    }
-
-    if (batch.length > 0) {
-        const batchBytes = batch.reduce((s, b) => s + b.file.size, 0);
-        await sendBatch(batch, dotNetHelper);
-        completedFiles += batch.length;
-        completedBytes += batchBytes;
-        await dotNetHelper.invokeMethodAsync('OnUploadByteProgress', completedFiles, totalFiles, completedBytes, totalBytes);
-    }
-
-    await dotNetHelper.invokeMethodAsync('OnUploadCompleted');
-}
-
-async function sendBatch(batch, dotNetHelper) {
     const currentPath = await dotNetHelper.invokeMethodAsync('GetCurrentPath');
     const currentBucket = await dotNetHelper.invokeMethodAsync('GetCurrentBucket');
 
-    const byDir = new Map();
-    for (const { file, relativePath } of batch) {
+    for (const { file, relativePath } of fileList) {
         const dirPart = relativePath.includes('/')
             ? relativePath.substring(0, relativePath.lastIndexOf('/'))
             : '';
@@ -140,25 +108,66 @@ async function sendBatch(batch, dotNetHelper) {
             ? (currentPath ? currentPath + '/' + dirPart : dirPart)
             : currentPath;
 
-        if (!byDir.has(uploadPath)) byDir.set(uploadPath, []);
-        byDir.get(uploadPath).push(file);
+        try {
+            await uploadFileWithProgress(
+                file, currentBucket, uploadPath, dotNetHelper,
+                completedFiles, totalFiles, completedBytes, totalBytes
+            );
+        } catch (e) {
+            await dotNetHelper.invokeMethodAsync('OnUploadError', `Upload failed: ${e.message}`);
+            await dotNetHelper.invokeMethodAsync('OnUploadCompleted');
+            return;
+        }
+
+        completedFiles++;
+        completedBytes += file.size;
+        await dotNetHelper.invokeMethodAsync('OnUploadByteProgress',
+            completedFiles, totalFiles, completedBytes, totalBytes, '');
     }
 
-    for (const [uploadPath, files] of byDir) {
+    await dotNetHelper.invokeMethodAsync('OnUploadCompleted');
+}
+
+function uploadFileWithProgress(file, bucket, uploadPath, dotNetHelper,
+    completedFiles, totalFiles, completedBytes, totalBytes) {
+    return new Promise((resolve, reject) => {
         const fd = new FormData();
-        for (const file of files) {
-            fd.append('files', file, file.name);
-        }
-        const encodedBucket = encodeURIComponent(currentBucket);
-        const encodedPath = uploadPath ? uploadPath.split('/').map(encodeURIComponent).join('/') : '';
-        const response = await fetch(`/api/files/upload/${encodedBucket}/${encodedPath}`, {
-            method: 'POST',
-            body: fd
+        fd.append('files', file, file.name);
+
+        const encodedBucket = encodeURIComponent(bucket);
+        const encodedPath = uploadPath
+            ? uploadPath.split('/').map(encodeURIComponent).join('/')
+            : '';
+        const url = encodedPath
+            ? `/api/files/upload/${encodedBucket}/${encodedPath}`
+            : `/api/files/upload/${encodedBucket}`;
+
+        const xhr = new XMLHttpRequest();
+
+        let lastProgressTime = 0;
+        xhr.upload.addEventListener('progress', e => {
+            if (!e.lengthComputable) return;
+            const now = Date.now();
+            if (now - lastProgressTime < 100) return; // max 10 updates/sec
+            lastProgressTime = now;
+            dotNetHelper.invokeMethodAsync('OnUploadByteProgress',
+                completedFiles, totalFiles,
+                completedBytes + e.loaded, totalBytes,
+                file.name);
         });
-        if (!response.ok) {
-            const text = await response.text();
-            console.error('Upload failed:', text);
-            await dotNetHelper.invokeMethodAsync('OnUploadError', `Upload failed: ${response.statusText}`);
-        }
-    }
+
+        xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve();
+            } else {
+                reject(new Error(xhr.statusText || `HTTP ${xhr.status}`));
+            }
+        });
+
+        xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+
+        xhr.open('POST', url);
+        xhr.send(fd);
+    });
 }

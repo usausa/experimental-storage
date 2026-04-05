@@ -10,11 +10,14 @@ using StorageServer.Helpers;
 using StorageServer.Storage;
 using StorageServer.Storage.Models;
 
-/// <summary>
-/// Maps S3-compatible Minimal API endpoints under /storage/*.
-/// </summary>
+// ReSharper disable ClassNeverInstantiated.Local
+#pragma warning disable CA1812
 public static class S3Endpoints
 {
+    //--------------------------------------------------------------------------------
+    // Mapping
+    //--------------------------------------------------------------------------------
+
     public static void MapS3Endpoints(this WebApplication app)
     {
         app.MapGet("/storage/", HandleListBuckets);
@@ -32,24 +35,28 @@ public static class S3Endpoints
         app.MapPost("/storage/{bucket}/{**key}", HandleObjectPost);
     }
 
-    // ===== ListBuckets =====
+    //--------------------------------------------------------------------------------
+    // ListBuckets
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleListBuckets(IStorageService storage)
+    private static async ValueTask<IResult> HandleListBuckets(IStorageService storage)
     {
         var buckets = await storage.ListBucketsAsync();
-        return Xml(new XDocument(
+        return XmlResult(new XDocument(
             new XDeclaration("1.0", "UTF-8", null),
             new XElement(S3Names.ListAllMyBucketsResult,
                 new XElement(S3Names.Owner,
                     new XElement(S3Names.ID, "owner"),
                     new XElement(S3Names.DisplayName, "owner")),
                 new XElement(S3Names.Buckets,
-                    buckets.Select(b => new XElement(S3Names.Bucket,
-                        new XElement(S3Names.Name, b.Name),
-                        new XElement(S3Names.CreationDate, b.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture))))))));
+                    buckets.Select(static x => new XElement(S3Names.Bucket,
+                        new XElement(S3Names.Name, x.Name),
+                        new XElement(S3Names.CreationDate, x.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture))))))));
     }
 
-    // ===== Query parameter records =====
+    //--------------------------------------------------------------------------------
+    // Bucket GET
+    //--------------------------------------------------------------------------------
 
     private sealed record BucketGetQuery(
         string? Location,
@@ -69,46 +76,7 @@ public static class S3Endpoints
         [property: FromQuery(Name = "start-after")] string? StartAfter,
         [property: FromQuery(Name = "continuation-token")] string? ContinuationToken);
 
-    private sealed record BucketPutQuery(
-        string? Tagging,
-        string? Acl,
-        string? Cors,
-        string? Versioning,
-        string? Lifecycle,
-        string? Policy,
-        string? Logging,
-        string? Notification,
-        string? Encryption);
-
-    private sealed record BucketDeleteQuery(
-        string? Tagging,
-        string? Cors);
-
-    private sealed record BucketPostQuery(
-        string? Delete);
-
-    private sealed record ObjectGetQuery(
-        string? Tagging,
-        string? Acl,
-        string? UploadId);
-
-    private sealed record ObjectPutQuery(
-        string? Tagging,
-        string? Acl,
-        int? PartNumber,
-        string? UploadId);
-
-    private sealed record ObjectDeleteQuery(
-        string? Tagging,
-        string? UploadId);
-
-    private sealed record ObjectPostQuery(
-        string? Uploads,
-        string? UploadId);
-
-    // ===== Bucket GET =====
-
-    private static async Task<IResult> HandleBucketGet(
+    private static async ValueTask<IResult> HandleBucketGet(
         string bucket,
         [AsParameters] BucketGetQuery query,
         IStorageService storage)
@@ -116,28 +84,28 @@ public static class S3Endpoints
         if (query.Location is not null)
         {
             var info = await storage.GetBucketInfoAsync(bucket);
-            return Xml(new XDocument(
+            return XmlResult(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.LocationConstraint, info.Region)));
         }
         if (query.Tagging is not null)
         {
             var tags = await storage.GetBucketTagsAsync(bucket);
-            return Xml(BuildTagging(tags));
+            return XmlResult(BuildTagging(tags));
         }
         if (query.Acl is not null)
         {
             var acl = await storage.GetBucketAclAsync(bucket);
-            return Xml(BuildAccessControlPolicy(acl));
+            return XmlResult(BuildAccessControlPolicy(acl));
         }
         if (query.Cors is not null)
         {
             var cors = await storage.GetBucketCorsAsync(bucket);
-            return Xml(BuildCorsConfiguration(cors));
+            return XmlResult(BuildCorsConfiguration(cors));
         }
         if (query.Versioning is not null)
         {
-            return Xml(new XDocument(
+            return XmlResult(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.VersioningConfiguration,
                     new XElement(S3Names.Status, "Enabled"))));
@@ -151,14 +119,14 @@ public static class S3Endpoints
         if (query.Uploads is not null)
         {
             var uploads = await storage.ListMultipartUploadsAsync(bucket);
-            return Xml(new XDocument(
+            return XmlResult(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.ListMultipartUploadsResult,
                     new XElement(S3Names.Bucket, bucket),
-                    uploads.Select(u => new XElement(S3Names.Upload,
-                        new XElement(S3Names.Key, u.Key),
-                        new XElement(S3Names.UploadId, u.UploadId),
-                        new XElement(S3Names.Initiated, u.Initiated.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)))))));
+                    uploads.Select(static x => new XElement(S3Names.Upload,
+                        new XElement(S3Names.Key, x.Key),
+                        new XElement(S3Names.UploadId, x.UploadId),
+                        new XElement(S3Names.Initiated, x.Initiated.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)))))));
         }
 
         var options = new ListObjectsOptions
@@ -170,12 +138,25 @@ public static class S3Endpoints
             ContinuationToken = query.ContinuationToken
         };
         var result = await storage.ListObjectsAsync(bucket, options);
-        return Xml(BuildListBucketResult(bucket, result, options));
+        return XmlResult(BuildListBucketResult(bucket, result, options));
     }
 
-    // ===== Bucket PUT =====
+    //--------------------------------------------------------------------------------
+    // Bucket PUT
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleBucketPut(
+    private sealed record BucketPutQuery(
+        string? Tagging,
+        string? Acl,
+        string? Cors,
+        string? Versioning,
+        string? Lifecycle,
+        string? Policy,
+        string? Logging,
+        string? Notification,
+        string? Encryption);
+
+    private static async ValueTask<IResult> HandleBucketPut(
         HttpContext context,
         string bucket,
         [AsParameters] BucketPutQuery query,
@@ -211,9 +192,11 @@ public static class S3Endpoints
         return Results.Ok();
     }
 
-    // ===== Bucket HEAD =====
+    //--------------------------------------------------------------------------------
+    // Bucket HEAD
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleBucketHead(
+    private static async ValueTask<IResult> HandleBucketHead(
         string bucket,
         IStorageService storage)
     {
@@ -221,9 +204,15 @@ public static class S3Endpoints
         return exists ? Results.Ok() : Results.NotFound();
     }
 
-    // ===== Bucket DELETE =====
+    //--------------------------------------------------------------------------------
+    // Bucket DELETE
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleBucketDelete(
+    private sealed record BucketDeleteQuery(
+        string? Tagging,
+        string? Cors);
+
+    private static async ValueTask<IResult> HandleBucketDelete(
         string bucket,
         [AsParameters] BucketDeleteQuery query,
         IStorageService storage)
@@ -243,9 +232,14 @@ public static class S3Endpoints
         return Results.NoContent();
     }
 
-    // ===== Bucket POST (DeleteObjects) =====
+    //--------------------------------------------------------------------------------
+    // Bucket POST
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleBucketPost(
+    private sealed record BucketPostQuery(
+        string? Delete);
+
+    private static async ValueTask<IResult> HandleBucketPost(
         HttpContext context,
         string bucket,
         [AsParameters] BucketPostQuery query,
@@ -256,78 +250,91 @@ public static class S3Endpoints
             var doc = await XDocument.LoadAsync(context.Request.Body, LoadOptions.None, context.RequestAborted);
             var keys = ParseDeleteObjects(doc);
             var results = await storage.DeleteObjectsAsync(bucket, keys);
-            return Xml(BuildDeleteResult(results));
+            return XmlResult(BuildDeleteResult(results));
         }
         return Results.BadRequest();
     }
 
-    // ===== Object GET =====
+    //--------------------------------------------------------------------------------
+    // Object GET
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleObjectGet(
+    private sealed record ObjectGetQuery(
+        string? Tagging,
+        string? Acl,
+        string? UploadId);
+
+    private sealed record ObjectGetHeaders(
+        [property: FromHeader(Name = "Range")] string? Range,
+        [property: FromHeader(Name = "If-None-Match")] string? IfNoneMatch,
+        [property: FromHeader(Name = "If-Match")] string? IfMatch,
+        [property: FromHeader(Name = "If-Modified-Since")] string? IfModifiedSince,
+        [property: FromHeader(Name = "If-Unmodified-Since")] string? IfUnmodifiedSince);
+
+    private static async ValueTask<IResult> HandleObjectGet(
         HttpContext context,
         string bucket,
         string key,
         [AsParameters] ObjectGetQuery query,
+        [AsParameters] ObjectGetHeaders headers,
         IStorageService storage)
     {
         if (query.Tagging is not null)
         {
             var tags = await storage.GetObjectTagsAsync(bucket, key);
-            return Xml(BuildTagging(tags));
+            return XmlResult(BuildTagging(tags));
         }
         if (query.Acl is not null)
         {
             var aclValue = await storage.GetObjectAclAsync(bucket, key);
-            return Xml(BuildAccessControlPolicy(aclValue));
+            return XmlResult(BuildAccessControlPolicy(aclValue));
         }
         if (query.UploadId is not null)
         {
             var parts = await storage.ListPartsAsync(query.UploadId);
-            return Xml(new XDocument(
+            return XmlResult(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.ListPartsResult,
                     new XElement(S3Names.Bucket, bucket),
                     new XElement(S3Names.Key, key),
                     new XElement(S3Names.UploadId, query.UploadId),
-                    parts.Select(p => new XElement(S3Names.Part,
-                        new XElement(S3Names.PartNumber, p.PartNumber),
-                        new XElement(S3Names.ETag, p.ETag),
-                        new XElement(S3Names.Size, p.Size),
-                        new XElement(S3Names.LastModified, p.LastModified.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)))))));
+                    parts.Select(static x => new XElement(S3Names.Part,
+                        new XElement(S3Names.PartNumber, x.PartNumber),
+                        new XElement(S3Names.ETag, x.ETag),
+                        new XElement(S3Names.Size, x.Size),
+                        new XElement(S3Names.LastModified, x.LastModified.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)))))));
         }
 
         var options = new GetObjectOptions();
-        var headers = context.Request.Headers;
 
-        if (headers.TryGetValue("Range", out var rangeValues))
+        if (headers.Range is not null &&
+            headers.Range.StartsWith("bytes=", StringComparison.Ordinal))
         {
-            var rangeHeader = rangeValues.First()!;
-            if (rangeHeader.StartsWith("bytes=", StringComparison.Ordinal))
-            {
-                var range = rangeHeader["bytes=".Length..];
-                var rangeParts = range.Split('-');
-                var start = Int64.TryParse(rangeParts[0], out var s) ? s : (long?)null;
-                var end = rangeParts.Length > 1 && Int64.TryParse(rangeParts[1], out var e) ? e : (long?)null;
-                options = options with { RangeStart = start, RangeEnd = end };
-            }
+            var range = headers.Range["bytes=".Length..];
+            var rangeParts = range.Split('-');
+            var start = Int64.TryParse(rangeParts[0], out var s) ? s : (long?)null;
+            var end = rangeParts.Length > 1 && Int64.TryParse(rangeParts[1], out var e) ? e : (long?)null;
+            options = options with { RangeStart = start, RangeEnd = end };
         }
 
-        if (headers.TryGetValue("If-None-Match", out var ifNoneMatchValues))
+        if (headers.IfNoneMatch is not null)
         {
-            options = options with { IfNoneMatch = ifNoneMatchValues.First() };
+            options = options with { IfNoneMatch = headers.IfNoneMatch };
         }
 
-        if (headers.TryGetValue("If-Match", out var ifMatchValues))
+        if (headers.IfMatch is not null)
         {
-            options = options with { IfMatch = ifMatchValues.First() };
+            options = options with { IfMatch = headers.IfMatch };
         }
 
-        if (headers.TryGetValue("If-Modified-Since", out var ifModifiedSinceValues) && DateTimeOffset.TryParse(ifModifiedSinceValues.First(), out var ims))
+        if (headers.IfModifiedSince is not null &&
+            DateTimeOffset.TryParse(headers.IfModifiedSince, out var ims))
         {
             options = options with { IfModifiedSince = ims };
         }
 
-        if (headers.TryGetValue("If-Unmodified-Since", out var ifUnmodifiedSinceValues) && DateTimeOffset.TryParse(ifUnmodifiedSinceValues.First(), out var ius))
+        if (headers.IfUnmodifiedSince is not null &&
+            DateTimeOffset.TryParse(headers.IfUnmodifiedSince, out var ius))
         {
             options = options with { IfUnmodifiedSince = ius };
         }
@@ -352,9 +359,17 @@ public static class S3Endpoints
         return Results.Empty;
     }
 
-    // ===== Object PUT =====
+    //--------------------------------------------------------------------------------
+    // Object PUT
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleObjectPut(
+    private sealed record ObjectPutQuery(
+        string? Tagging,
+        string? Acl,
+        int? PartNumber,
+        string? UploadId);
+
+    private static async ValueTask<IResult> HandleObjectPut(
         HttpContext context,
         string bucket,
         string key,
@@ -411,7 +426,7 @@ public static class S3Endpoints
             }
 
             var copyResult = await storage.CopyObjectAsync(bucket, key, srcBucket, srcKey, copyOptions);
-            return Xml(new XDocument(
+            return XmlResult(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.CopyObjectResult,
                     new XElement(S3Names.LastModified, copyResult.LastModified.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)),
@@ -427,9 +442,11 @@ public static class S3Endpoints
         return Results.Ok();
     }
 
-    // ===== Object HEAD =====
+    //--------------------------------------------------------------------------------
+    // Object HEAD
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleObjectHead(
+    private static async ValueTask<IResult> HandleObjectHead(
         HttpContext context,
         string bucket,
         string key,
@@ -455,9 +472,15 @@ public static class S3Endpoints
         return Results.Empty;
     }
 
-    // ===== Object DELETE =====
+    //--------------------------------------------------------------------------------
+    // Object DELETE
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleObjectDelete(
+    private sealed record ObjectDeleteQuery(
+        string? Tagging,
+        string? UploadId);
+
+    private static async ValueTask<IResult> HandleObjectDelete(
         string bucket,
         string key,
         [AsParameters] ObjectDeleteQuery query,
@@ -478,9 +501,15 @@ public static class S3Endpoints
         return Results.NoContent();
     }
 
-    // ===== Object POST =====
+    //--------------------------------------------------------------------------------
+    // Object POST
+    //--------------------------------------------------------------------------------
 
-    private static async Task<IResult> HandleObjectPost(
+    private sealed record ObjectPostQuery(
+        string? Uploads,
+        string? UploadId);
+
+    private static async ValueTask<IResult> HandleObjectPost(
         HttpContext context,
         string bucket,
         string key,
@@ -491,7 +520,7 @@ public static class S3Endpoints
         {
             var options = ExtractPutOptions(context.Request.Headers);
             var newUploadId = await storage.CreateMultipartUploadAsync(bucket, key, options);
-            return Xml(new XDocument(
+            return XmlResult(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.InitiateMultipartUploadResult,
                     new XElement(S3Names.Bucket, bucket),
@@ -504,7 +533,7 @@ public static class S3Endpoints
             var doc = await XDocument.LoadAsync(context.Request.Body, LoadOptions.None, context.RequestAborted);
             var parts = ParseCompleteMultipartUpload(doc);
             var result = await storage.CompleteMultipartUploadAsync(query.UploadId, parts);
-            return Xml(new XDocument(
+            return XmlResult(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.CompleteMultipartUploadResult,
                     new XElement(S3Names.Bucket, result.Bucket),
@@ -515,18 +544,20 @@ public static class S3Endpoints
         return Results.BadRequest();
     }
 
-    // ===== XML helpers =====
+    //--------------------------------------------------------------------------------
+    // Xml Helper
+    //--------------------------------------------------------------------------------
 
-    private static IResult Xml(XDocument doc) =>
+    private static IResult XmlResult(XDocument doc) =>
         Results.Content(doc.Declaration + doc.ToString(), "application/xml");
 
     private static XDocument BuildTagging(Dictionary<string, string> tags) =>
         new(new XDeclaration("1.0", "UTF-8", null),
             new XElement(S3Names.Tagging,
                 new XElement(S3Names.TagSet,
-                    tags.Select(t => new XElement(S3Names.Tag,
-                        new XElement(S3Names.Key, t.Key),
-                        new XElement(S3Names.Value, t.Value))))));
+                    tags.Select(static x => new XElement(S3Names.Tag,
+                        new XElement(S3Names.Key, x.Key),
+                        new XElement(S3Names.Value, x.Value))))));
 
     private static XDocument BuildAccessControlPolicy(string acl)
     {
@@ -574,12 +605,12 @@ public static class S3Endpoints
     private static XDocument BuildCorsConfiguration(IEnumerable<CorsRule> rules) =>
         new(new XDeclaration("1.0", "UTF-8", null),
             new XElement(S3Names.CORSConfiguration,
-                rules.Select(r => new XElement(S3Names.CORSRule,
-                    r.AllowedOrigins.Select(o => new XElement(S3Names.AllowedOrigin, o)),
-                    r.AllowedMethods.Select(m => new XElement(S3Names.AllowedMethod, m)),
-                    r.AllowedHeaders.Select(h => new XElement(S3Names.AllowedHeader, h)),
-                    r.ExposeHeaders.Select(h => new XElement(S3Names.ExposeHeader, h)),
-                    r.MaxAgeSeconds > 0 ? new XElement(S3Names.MaxAgeSeconds, r.MaxAgeSeconds) : null))));
+                rules.Select(static x => new XElement(S3Names.CORSRule,
+                    x.AllowedOrigins.Select(static y => new XElement(S3Names.AllowedOrigin, y)),
+                    x.AllowedMethods.Select(static y => new XElement(S3Names.AllowedMethod, y)),
+                    x.AllowedHeaders.Select(static y => new XElement(S3Names.AllowedHeader, y)),
+                    x.ExposeHeaders.Select(static y => new XElement(S3Names.ExposeHeader, y)),
+                    x.MaxAgeSeconds > 0 ? new XElement(S3Names.MaxAgeSeconds, x.MaxAgeSeconds) : null))));
 
     private static XDocument BuildListBucketResult(string bucket, ListObjectsResult result, ListObjectsOptions options)
     {
@@ -652,15 +683,17 @@ public static class S3Endpoints
             new XElement(S3Names.DeleteResult, elements));
     }
 
-    // ===== Parse helpers =====
+    //--------------------------------------------------------------------------------
+    // Parse Helper
+    //--------------------------------------------------------------------------------
 
     private static Dictionary<string, string> ParseTagging(XDocument doc)
     {
         var tags = new Dictionary<string, string>();
-        foreach (var tag in doc.Descendants().Where(e => e.Name.LocalName == "Tag"))
+        foreach (var tag in doc.Descendants().Where(static x => x.Name.LocalName == "Tag"))
         {
-            var key = tag.Elements().FirstOrDefault(e => e.Name.LocalName == "Key")?.Value;
-            var value = tag.Elements().FirstOrDefault(e => e.Name.LocalName == "Value")?.Value;
+            var key = tag.Elements().FirstOrDefault(static x => x.Name.LocalName == "Key")?.Value;
+            var value = tag.Elements().FirstOrDefault(static x => x.Name.LocalName == "Value")?.Value;
             if (key is not null)
             {
                 tags[key] = value ?? string.Empty;
@@ -671,34 +704,36 @@ public static class S3Endpoints
 
     private static List<CorsRule> ParseCorsConfiguration(XDocument doc) =>
         doc.Descendants()
-            .Where(e => e.Name.LocalName == "CORSRule")
-            .Select(r => new CorsRule
+            .Where(static x => x.Name.LocalName == "CORSRule")
+            .Select(static x => new CorsRule
             {
-                AllowedOrigins = r.Elements().Where(e => e.Name.LocalName == "AllowedOrigin").Select(e => e.Value).ToList(),
-                AllowedMethods = r.Elements().Where(e => e.Name.LocalName == "AllowedMethod").Select(e => e.Value).ToList(),
-                AllowedHeaders = r.Elements().Where(e => e.Name.LocalName == "AllowedHeader").Select(e => e.Value).ToList(),
-                ExposeHeaders = r.Elements().Where(e => e.Name.LocalName == "ExposeHeader").Select(e => e.Value).ToList(),
-                MaxAgeSeconds = Int32.TryParse(r.Elements().FirstOrDefault(e => e.Name.LocalName == "MaxAgeSeconds")?.Value, out var s) ? s : 0
+                AllowedOrigins = x.Elements().Where(static y => y.Name.LocalName == "AllowedOrigin").Select(static y => y.Value).ToList(),
+                AllowedMethods = x.Elements().Where(static y => y.Name.LocalName == "AllowedMethod").Select(static y => y.Value).ToList(),
+                AllowedHeaders = x.Elements().Where(static y => y.Name.LocalName == "AllowedHeader").Select(static y => y.Value).ToList(),
+                ExposeHeaders = x.Elements().Where(static y => y.Name.LocalName == "ExposeHeader").Select(static y => y.Value).ToList(),
+                MaxAgeSeconds = Int32.TryParse(x.Elements().FirstOrDefault(static y => y.Name.LocalName == "MaxAgeSeconds")?.Value, out var s) ? s : 0
             }).ToList();
 
     private static List<string> ParseDeleteObjects(XDocument doc) =>
         doc.Descendants()
-            .Where(e => e.Name.LocalName == "Object")
-            .Select(e => e.Elements().FirstOrDefault(k => k.Name.LocalName == "Key")?.Value)
-            .Where(k => k is not null)
+            .Where(static x => x.Name.LocalName == "Object")
+            .Select(static x => x.Elements().FirstOrDefault(static y => y.Name.LocalName == "Key")?.Value)
+            .Where(static x => x is not null)
             .Cast<string>()
             .ToList();
 
     private static List<PartInfo> ParseCompleteMultipartUpload(XDocument doc) =>
         doc.Descendants()
-            .Where(e => e.Name.LocalName == "Part")
-            .Select(p => new PartInfo
+            .Where(static x => x.Name.LocalName == "Part")
+            .Select(static x => new PartInfo
             {
-                PartNumber = Int32.TryParse(p.Elements().FirstOrDefault(e => e.Name.LocalName == "PartNumber")?.Value, out var n) ? n : 0,
-                ETag = p.Elements().FirstOrDefault(e => e.Name.LocalName == "ETag")?.Value ?? string.Empty
+                PartNumber = Int32.TryParse(x.Elements().FirstOrDefault(static y => y.Name.LocalName == "PartNumber")?.Value, out var n) ? n : 0,
+                ETag = x.Elements().FirstOrDefault(static y => y.Name.LocalName == "ETag")?.Value ?? string.Empty
             }).ToList();
 
-    // ===== Request helpers =====
+    //--------------------------------------------------------------------------------
+    // Request Helper
+    //--------------------------------------------------------------------------------
 
     private static Stream GetBodyStream(HttpContext context)
     {
@@ -755,3 +790,5 @@ public static class S3Endpoints
         return options;
     }
 }
+#pragma warning restore CA1812
+// ReSharper restore ClassNeverInstantiated.Local

@@ -5,6 +5,10 @@ using StorageServer.Storage.Models;
 
 public static class FileEndpoint
 {
+    //--------------------------------------------------------------------------------
+    // Mapping
+    //--------------------------------------------------------------------------------
+
     public static void MapFileEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/files");
@@ -16,7 +20,11 @@ public static class FileEndpoint
         group.MapPost("/upload/{bucket}", HandleUpload).DisableAntiforgery();
     }
 
-    private static async Task<IResult> HandleDownload(
+    //--------------------------------------------------------------------------------
+    // Handler
+    //--------------------------------------------------------------------------------
+
+    private static async ValueTask<IResult> HandleDownload(
         HttpContext context,
         string bucket,
         string key,
@@ -38,16 +46,19 @@ public static class FileEndpoint
         return Results.Stream(data.Content, data.Head.ContentType, enableRangeProcessing: false);
     }
 
-    private static async Task<IResult> HandlePreview(
+    private static async ValueTask<IResult> HandlePreview(
         string bucket,
         string key,
+        string? versionId,
         IStorageService storage)
     {
-        var data = await storage.GetObjectAsync(bucket, key);
+        var data = versionId is not null
+            ? await storage.GetObjectVersionAsync(bucket, key, versionId)
+            : await storage.GetObjectAsync(bucket, key);
         return Results.Stream(data.Content, data.Head.ContentType, enableRangeProcessing: true);
     }
 
-    private static async Task<IResult> HandleThumbnail(
+    private static async ValueTask<IResult> HandleThumbnail(
         string bucket,
         string key,
         IStorageService storage)
@@ -60,25 +71,25 @@ public static class FileEndpoint
         return Results.Stream(stream, "image/png");
     }
 
-    private static Task<IResult> HandleUploadWithPrefix(
+    private static ValueTask<IResult> HandleUploadWithPrefix(
         HttpContext context,
         string bucket,
         string prefix,
         IStorageService storage)
-    {
-        return UploadFiles(bucket, prefix, context, storage);
-    }
+        => UploadFiles(bucket, prefix, context, storage);
 
-    private static Task<IResult> HandleUpload(
+    private static ValueTask<IResult> HandleUpload(
         HttpContext context,
         string bucket,
         string? prefix,
         IStorageService storage)
-    {
-        return UploadFiles(bucket, prefix ?? string.Empty, context, storage);
-    }
+        => UploadFiles(bucket, prefix ?? string.Empty, context, storage);
 
-    private static async Task<IResult> UploadFiles(
+    //--------------------------------------------------------------------------------
+    // Helper
+    //--------------------------------------------------------------------------------
+
+    private static async ValueTask<IResult> UploadFiles(
         string bucket,
         string prefix,
         HttpContext context,
