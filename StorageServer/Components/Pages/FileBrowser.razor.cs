@@ -68,6 +68,17 @@ public partial class FileBrowser : IAsyncDisposable
         _ => sortAsc ? objects.OrderBy(o => o.Key) : objects.OrderByDescending(o => o.Key)
     };
 
+    public async ValueTask DisposeAsync()
+    {
+        if (jsModule is not null)
+        {
+            await jsModule.DisposeAsync();
+        }
+
+        dotNetRef?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
     protected override Task OnParametersSetAsync()
     {
         if (!String.IsNullOrEmpty(Prefix) && !Prefix.EndsWith('/'))
@@ -411,16 +422,5 @@ public partial class FileBrowser : IAsyncDisposable
     {
         showOverwriteConfirm = false;
         overwriteTcs?.TrySetResult(false);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (jsModule is not null)
-        {
-            await jsModule.DisposeAsync();
-        }
-
-        dotNetRef?.Dispose();
-        GC.SuppressFinalize(this);
     }
 }

@@ -1,9 +1,17 @@
 namespace StorageServer.Helpers;
 
+using System.Buffers;
+
 public sealed class ChunkedStream : Stream
 {
+    private const int LineBufferSize = 4096;
+
+    // The inner stream is owned by the request pipeline; do not dispose it.
+#pragma warning disable CA2213
     private readonly Stream inner;
-    private readonly byte[] lineBuffer = new byte[4096];
+#pragma warning restore CA2213
+
+    private readonly byte[] lineBuffer;
 
     private int chunkRemaining;
     private bool finished;
@@ -26,11 +34,15 @@ public sealed class ChunkedStream : Stream
     {
         ArgumentNullException.ThrowIfNull(inner);
         this.inner = inner;
+        lineBuffer = ArrayPool<byte>.Shared.Rent(LineBufferSize);
     }
 
     protected override void Dispose(bool disposing)
     {
-        // The inner stream is owned by the request pipeline; do not dispose it.
+        if (disposing)
+        {
+            ArrayPool<byte>.Shared.Return(lineBuffer);
+        }
         base.Dispose(disposing);
     }
 
@@ -103,7 +115,7 @@ public sealed class ChunkedStream : Stream
     private async Task<string?> ReadLineAsync(CancellationToken cancellationToken)
     {
         var pos = 0;
-        while (pos < lineBuffer.Length)
+        while (pos < LineBufferSize)
         {
             var buf = new byte[1];
             var n = await inner.ReadAsync(buf.AsMemory(0, 1), cancellationToken);
@@ -115,7 +127,7 @@ public sealed class ChunkedStream : Stream
             var b = buf[0];
             if (b == '\r')
             {
-                await inner.ReadAsync(buf.AsMemory(0, 1), cancellationToken);
+                await inner.ReadExactlyAsync(buf.AsMemory(0, 1), cancellationToken);
                 return System.Text.Encoding.ASCII.GetString(lineBuffer, 0, pos);
             }
 

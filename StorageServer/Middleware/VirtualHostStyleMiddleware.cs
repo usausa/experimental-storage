@@ -11,7 +11,7 @@ namespace StorageServer.Middleware;
 /// </summary>
 public class VirtualHostStyleMiddleware(RequestDelegate next, IConfiguration configuration)
 {
-    private readonly string baseHostname = configuration.GetValue<string>("Storage:BaseHostname") ?? "s3.localhost";
+    private readonly string baseHostname = configuration.GetValue<string>("S3:BaseHostname") ?? "s3.localhost";
 
     private static readonly string[] AppPrefixes =
     [

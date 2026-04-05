@@ -16,10 +16,13 @@ public static class FileEndpoint
         group.MapPost("/upload/{bucket}", HandleUpload).DisableAntiforgery();
     }
 
-    private static async Task<IResult> HandleDownload(string bucket, string key, HttpContext ctx, IStorageService storage)
+    private static async Task<IResult> HandleDownload(
+        HttpContext context,
+        string bucket,
+        string key,
+        string? versionId,
+        IStorageService storage)
     {
-        var versionId = ctx.Request.Query["versionId"].FirstOrDefault();
-
         ObjectData data;
         if (versionId is not null)
         {
@@ -31,17 +34,23 @@ public static class FileEndpoint
         }
 
         var fileName = Path.GetFileName(key);
-        ctx.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
+        context.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
         return Results.Stream(data.Content, data.Head.ContentType, enableRangeProcessing: false);
     }
 
-    private static async Task<IResult> HandlePreview(string bucket, string key, IStorageService storage)
+    private static async Task<IResult> HandlePreview(
+        string bucket,
+        string key,
+        IStorageService storage)
     {
         var data = await storage.GetObjectAsync(bucket, key);
         return Results.Stream(data.Content, data.Head.ContentType, enableRangeProcessing: true);
     }
 
-    private static async Task<IResult> HandleThumbnail(string bucket, string key, IStorageService storage)
+    private static async Task<IResult> HandleThumbnail(
+        string bucket,
+        string key,
+        IStorageService storage)
     {
         var stream = await storage.GetThumbnailAsync(bucket, key);
         if (stream is null)
@@ -51,25 +60,36 @@ public static class FileEndpoint
         return Results.Stream(stream, "image/png");
     }
 
-    private static Task<IResult> HandleUploadWithPrefix(string bucket, string prefix, HttpContext ctx, IStorageService storage)
+    private static Task<IResult> HandleUploadWithPrefix(
+        HttpContext context,
+        string bucket,
+        string prefix,
+        IStorageService storage)
     {
-        return UploadFiles(bucket, prefix, ctx, storage);
+        return UploadFiles(bucket, prefix, context, storage);
     }
 
-    private static Task<IResult> HandleUpload(string bucket, HttpContext ctx, IStorageService storage)
+    private static Task<IResult> HandleUpload(
+        HttpContext context,
+        string bucket,
+        string? prefix,
+        IStorageService storage)
     {
-        var prefix = ctx.Request.Query["prefix"].FirstOrDefault() ?? string.Empty;
-        return UploadFiles(bucket, prefix, ctx, storage);
+        return UploadFiles(bucket, prefix ?? string.Empty, context, storage);
     }
 
-    private static async Task<IResult> UploadFiles(string bucket, string prefix, HttpContext ctx, IStorageService storage)
+    private static async Task<IResult> UploadFiles(
+        string bucket,
+        string prefix,
+        HttpContext context,
+        IStorageService storage)
     {
         if (!String.IsNullOrEmpty(prefix) && !prefix.EndsWith('/'))
         {
             prefix += "/";
         }
 
-        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
+        var form = await context.Request.ReadFormAsync(context.RequestAborted);
 
         var uploaded = new List<object>();
         foreach (var file in form.Files)

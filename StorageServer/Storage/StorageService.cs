@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 
 using StorageServer.Storage.Models;
 
-public sealed class StorageService : IStorageService
+public sealed class StorageService : IStorageService, IDisposable
 {
     private static readonly Meter StorageMeter = new("StorageServer.Storage");
 
@@ -31,21 +31,22 @@ public sealed class StorageService : IStorageService
         WriteIndented = true
     };
 
-    private static readonly Random Random = new();
-
-    private readonly string bucketsPath;
-    private readonly string multipartPath;
-    private readonly StorageOptions options;
     private readonly ILogger<StorageService> logger;
 
-    public StorageService(
-        IOptions<StorageOptions> options,
-        ILogger<StorageService> logger)
-    {
-        this.options = options.Value;
-        this.logger = logger;
+    private readonly StorageOptions storageOptions;
+    private readonly string bucketsPath;
+    private readonly string multipartPath;
 
-        var basePath = Path.GetFullPath(this.options.BasePath);
+    private static readonly Random Random = new();
+
+    public StorageService(
+        ILogger<StorageService> logger,
+        IOptions<StorageOptions> options)
+    {
+        this.logger = logger;
+        storageOptions = options.Value;
+
+        var basePath = Path.GetFullPath(storageOptions.BasePath);
         bucketsPath = Path.Combine(basePath, "buckets");
         multipartPath = Path.Combine(basePath, "multipart");
 
@@ -55,6 +56,11 @@ public sealed class StorageService : IStorageService
         putCounter = StorageMeter.CreateCounter<long>("storage.put_objects", "objects", "Number of objects put");
         getCounter = StorageMeter.CreateCounter<long>("storage.get_objects", "objects", "Number of objects retrieved");
         deleteCounter = StorageMeter.CreateCounter<long>("storage.delete_objects", "objects", "Number of objects deleted");
+    }
+
+    public void Dispose()
+    {
+        activitySource.Dispose();
     }
 
     // ================================================================
@@ -127,7 +133,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<IReadOnlyList<BucketInfo>> ListBucketsAsync(CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("ListBuckets");
+        using var activity = activitySource.StartActivity();
 
         var results = new List<BucketInfo>();
 
@@ -156,7 +162,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask CreateBucketAsync(string bucket, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("CreateBucket");
+        using var activity = activitySource.StartActivity();
         activity?.SetTag("bucket", bucket);
 
         ValidateBucketName(bucket);
@@ -188,7 +194,7 @@ public sealed class StorageService : IStorageService
 
     public ValueTask DeleteBucketAsync(string bucket, bool force = false, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("DeleteBucket");
+        using var activity = activitySource.StartActivity();
         activity?.SetTag("bucket", bucket);
 
         ValidateBucketName(bucket);
@@ -273,7 +279,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<ListObjectsResult> ListObjectsAsync(string bucket, ListObjectsOptions options, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("ListObjects");
+        using var activity = activitySource.StartActivity();
         activity?.SetTag("bucket", bucket);
 
         ValidateBucketName(bucket);
@@ -361,7 +367,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<ObjectHead> HeadObjectAsync(string bucket, string key, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("HeadObject");
+        using var activity = activitySource.StartActivity();
 
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -393,7 +399,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<ObjectData> GetObjectAsync(string bucket, string key, GetObjectOptions? options = null, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("GetObject");
+        using var activity = activitySource.StartActivity();
         getCounter.Add(1);
 
         ValidateBucketName(bucket);
@@ -454,7 +460,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<PutObjectResult> PutObjectAsync(string bucket, string key, Stream data, PutObjectOptions? options = null, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("PutObject");
+        using var activity = activitySource.StartActivity();
         putCounter.Add(1);
 
         ValidateBucketName(bucket);
@@ -502,7 +508,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask DeleteObjectAsync(string bucket, string key, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("DeleteObject");
+        using var activity = activitySource.StartActivity();
         deleteCounter.Add(1);
 
         ValidateBucketName(bucket);
@@ -526,7 +532,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<IReadOnlyList<DeleteObjectResult>> DeleteObjectsAsync(string bucket, IEnumerable<string> keys, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("DeleteObjects");
+        using var activity = activitySource.StartActivity();
 
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
@@ -534,6 +540,7 @@ public sealed class StorageService : IStorageService
         var results = new List<DeleteObjectResult>();
         foreach (var key in keys)
         {
+#pragma warning disable CA1031
             try
             {
                 await DeleteObjectAsync(bucket, key, token);
@@ -553,6 +560,7 @@ public sealed class StorageService : IStorageService
                     ErrorMessage = ex.Message
                 });
             }
+#pragma warning restore CA1031
         }
 
         return results;
@@ -560,7 +568,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<CopyObjectResult> CopyObjectAsync(string bucket, string key, string sourceBucket, string sourceKey, CopyObjectOptions? options = null, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("CopyObject");
+        using var activity = activitySource.StartActivity();
 
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -928,7 +936,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<string> CreateMultipartUploadAsync(string bucket, string key, PutObjectOptions? options = null, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("CreateMultipartUpload");
+        using var activity = activitySource.StartActivity();
 
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -968,7 +976,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<UploadPartResult> UploadPartAsync(string uploadId, int partNumber, Stream data, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("UploadPart");
+        using var activity = activitySource.StartActivity();
 
         var uploadDir = Path.Combine(multipartPath, uploadId);
         if (!Directory.Exists(uploadDir))
@@ -992,7 +1000,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<CompleteMultipartResult> CompleteMultipartUploadAsync(string uploadId, IEnumerable<PartInfo> parts, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("CompleteMultipartUpload");
+        using var activity = activitySource.StartActivity();
 
         var uploadDir = Path.Combine(multipartPath, uploadId);
         if (!Directory.Exists(uploadDir))
@@ -1209,7 +1217,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask<ObjectData> GetObjectVersionAsync(string bucket, string key, string versionId, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("GetObjectVersion");
+        using var activity = activitySource.StartActivity();
 
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -1265,7 +1273,7 @@ public sealed class StorageService : IStorageService
 
     public async ValueTask RestoreVersionAsync(string bucket, string key, string versionId, CancellationToken token = default)
     {
-        using var activity = activitySource.StartActivity("RestoreVersion");
+        using var activity = activitySource.StartActivity();
 
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -1558,11 +1566,11 @@ public sealed class StorageService : IStorageService
             IsDeleteMarker = isDeleteMarker
         });
 
-        if (options.MaxVersionsPerObject > 0)
+        if (storageOptions.MaxVersionsPerObject > 0)
         {
             var nonDeleteVersions = index.Versions.Where(v => !v.IsDeleteMarker)
                 .OrderByDescending(v => v.LastModified).ToList();
-            while (nonDeleteVersions.Count > options.MaxVersionsPerObject)
+            while (nonDeleteVersions.Count > storageOptions.MaxVersionsPerObject)
             {
                 var oldest = nonDeleteVersions[^1];
                 nonDeleteVersions.RemoveAt(nonDeleteVersions.Count - 1);
@@ -1582,9 +1590,9 @@ public sealed class StorageService : IStorageService
             }
         }
 
-        if (options.VersionRetentionDays > 0)
+        if (storageOptions.VersionRetentionDays > 0)
         {
-            var cutoff = DateTimeOffset.UtcNow.AddDays(-options.VersionRetentionDays);
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-storageOptions.VersionRetentionDays);
             var expired = index.Versions.Where(v => v.LastModified < cutoff).ToList();
             foreach (var old in expired)
             {
@@ -1743,20 +1751,39 @@ public sealed class StorageService : IStorageService
         private readonly Stream inner;
         private long remaining;
 
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
         public BoundedStream(Stream inner, long length)
         {
             this.inner = inner;
             remaining = length;
         }
 
-        public override bool CanRead => true;
-        public override bool CanSeek => false;
-        public override bool CanWrite => false;
-        public override long Length => throw new NotSupportedException();
-        public override long Position
+        protected override void Dispose(bool disposing)
         {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
+            if (disposing)
+            {
+                inner.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await inner.DisposeAsync();
+            await base.DisposeAsync();
         }
 
         public override int Read(byte[] buffer, int offset, int count)
@@ -1801,23 +1828,11 @@ public sealed class StorageService : IStorageService
         public override void Flush()
         {
         }
+
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
         public override void SetLength(long value) => throw new NotSupportedException();
+
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                inner.Dispose();
-            }
-            base.Dispose(disposing);
-        }
-
-        public override async ValueTask DisposeAsync()
-        {
-            await inner.DisposeAsync();
-            GC.SuppressFinalize(this);
-        }
     }
 }

@@ -14,15 +14,17 @@ public static class VersionEndpoint
     }
 
     private static async Task<IResult> HandleListOrGet(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        HttpContext context,
+        string bucket,
+        string key,
+        string? versionId,
+        IStorageService storage)
     {
-        var versionId = ctx.Request.Query["versionId"].FirstOrDefault();
-
         if (versionId is not null)
         {
             var data = await storage.GetObjectVersionAsync(bucket, key, versionId);
             var fileName = Path.GetFileName(key);
-            ctx.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
+            context.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
             return Results.Stream(data.Content, data.Head.ContentType);
         }
 
@@ -31,7 +33,10 @@ public static class VersionEndpoint
     }
 
     private static async Task<IResult> HandleRestore(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        string bucket,
+        string key,
+        string? versionId,
+        IStorageService storage)
     {
         var actualKey = key;
         if (actualKey.EndsWith("/restore", StringComparison.Ordinal))
@@ -39,7 +44,6 @@ public static class VersionEndpoint
             actualKey = actualKey[..^"/restore".Length];
         }
 
-        var versionId = ctx.Request.Query["versionId"].FirstOrDefault();
         if (versionId is null)
         {
             return Results.BadRequest(new { error = "versionId query parameter is required" });
@@ -50,9 +54,11 @@ public static class VersionEndpoint
     }
 
     private static async Task<IResult> HandleDelete(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        string bucket,
+        string key,
+        string? versionId,
+        IStorageService storage)
     {
-        var versionId = ctx.Request.Query["versionId"].FirstOrDefault();
         if (versionId is null)
         {
             return Results.BadRequest(new { error = "versionId query parameter is required" });

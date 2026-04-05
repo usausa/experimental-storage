@@ -3,6 +3,8 @@ namespace StorageServer.Endpoints.S3;
 using System.Globalization;
 using System.Xml.Linq;
 
+using Microsoft.AspNetCore.Mvc;
+
 using StorageServer.Consts;
 using StorageServer.Helpers;
 using StorageServer.Storage;
@@ -47,49 +49,106 @@ public static class S3Endpoints
                         new XElement(S3Names.CreationDate, b.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture))))))));
     }
 
+    // ===== Query parameter records =====
+
+    private sealed record BucketGetQuery(
+        string? Location,
+        string? Tagging,
+        string? Acl,
+        string? Cors,
+        string? Versioning,
+        string? Lifecycle,
+        string? Policy,
+        string? Logging,
+        string? Notification,
+        string? Encryption,
+        string? Uploads,
+        string? Prefix,
+        string? Delimiter,
+        [property: FromQuery(Name = "max-keys")] int? MaxKeys,
+        [property: FromQuery(Name = "start-after")] string? StartAfter,
+        [property: FromQuery(Name = "continuation-token")] string? ContinuationToken);
+
+    private sealed record BucketPutQuery(
+        string? Tagging,
+        string? Acl,
+        string? Cors,
+        string? Versioning,
+        string? Lifecycle,
+        string? Policy,
+        string? Logging,
+        string? Notification,
+        string? Encryption);
+
+    private sealed record BucketDeleteQuery(
+        string? Tagging,
+        string? Cors);
+
+    private sealed record BucketPostQuery(
+        string? Delete);
+
+    private sealed record ObjectGetQuery(
+        string? Tagging,
+        string? Acl,
+        string? UploadId);
+
+    private sealed record ObjectPutQuery(
+        string? Tagging,
+        string? Acl,
+        int? PartNumber,
+        string? UploadId);
+
+    private sealed record ObjectDeleteQuery(
+        string? Tagging,
+        string? UploadId);
+
+    private sealed record ObjectPostQuery(
+        string? Uploads,
+        string? UploadId);
+
     // ===== Bucket GET =====
 
     private static async Task<IResult> HandleBucketGet(
-        string bucket, HttpContext ctx, IStorageService storage)
+        string bucket,
+        [AsParameters] BucketGetQuery query,
+        IStorageService storage)
     {
-        var query = ctx.Request.Query;
-
-        if (query.ContainsKey("location"))
+        if (query.Location is not null)
         {
             var info = await storage.GetBucketInfoAsync(bucket);
             return Xml(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.LocationConstraint, info.Region)));
         }
-        if (query.ContainsKey("tagging"))
+        if (query.Tagging is not null)
         {
             var tags = await storage.GetBucketTagsAsync(bucket);
             return Xml(BuildTagging(tags));
         }
-        if (query.ContainsKey("acl"))
+        if (query.Acl is not null)
         {
             var acl = await storage.GetBucketAclAsync(bucket);
             return Xml(BuildAccessControlPolicy(acl));
         }
-        if (query.ContainsKey("cors"))
+        if (query.Cors is not null)
         {
             var cors = await storage.GetBucketCorsAsync(bucket);
             return Xml(BuildCorsConfiguration(cors));
         }
-        if (query.ContainsKey("versioning"))
+        if (query.Versioning is not null)
         {
             return Xml(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.VersioningConfiguration,
                     new XElement(S3Names.Status, "Enabled"))));
         }
-        if (query.ContainsKey("lifecycle") || query.ContainsKey("policy") ||
-            query.ContainsKey("logging") || query.ContainsKey("notification") ||
-            query.ContainsKey("encryption"))
+        if (query.Lifecycle is not null || query.Policy is not null ||
+            query.Logging is not null || query.Notification is not null ||
+            query.Encryption is not null)
         {
             return Results.NoContent();
         }
-        if (query.ContainsKey("uploads"))
+        if (query.Uploads is not null)
         {
             var uploads = await storage.ListMultipartUploadsAsync(bucket);
             return Xml(new XDocument(
@@ -104,11 +163,11 @@ public static class S3Endpoints
 
         var options = new ListObjectsOptions
         {
-            Prefix = query["prefix"].FirstOrDefault(),
-            Delimiter = query["delimiter"].FirstOrDefault(),
-            MaxKeys = Int32.TryParse(query["max-keys"].FirstOrDefault(), out var mk) ? mk : 1000,
-            StartAfter = query["start-after"].FirstOrDefault(),
-            ContinuationToken = query["continuation-token"].FirstOrDefault()
+            Prefix = query.Prefix,
+            Delimiter = query.Delimiter,
+            MaxKeys = query.MaxKeys ?? 1000,
+            StartAfter = query.StartAfter,
+            ContinuationToken = query.ContinuationToken
         };
         var result = await storage.ListObjectsAsync(bucket, options);
         return Xml(BuildListBucketResult(bucket, result, options));
@@ -117,33 +176,33 @@ public static class S3Endpoints
     // ===== Bucket PUT =====
 
     private static async Task<IResult> HandleBucketPut(
-        string bucket, HttpContext ctx, IStorageService storage)
+        HttpContext context,
+        string bucket,
+        [AsParameters] BucketPutQuery query,
+        IStorageService storage)
     {
-        var query = ctx.Request.Query;
-
-        if (query.ContainsKey("tagging"))
+        if (query.Tagging is not null)
         {
-            var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
+            var doc = await XDocument.LoadAsync(context.Request.Body, LoadOptions.None, context.RequestAborted);
             var tags = ParseTagging(doc);
             await storage.PutBucketTagsAsync(bucket, tags);
             return Results.Ok();
         }
-        if (query.ContainsKey("acl"))
+        if (query.Acl is not null)
         {
-            var acl = ctx.Request.Headers["x-amz-acl"].FirstOrDefault() ?? "private";
-            await storage.PutBucketAclAsync(bucket, acl);
+            var aclValue = context.Request.Headers["x-amz-acl"].FirstOrDefault() ?? "private";
+            await storage.PutBucketAclAsync(bucket, aclValue);
             return Results.Ok();
         }
-        if (query.ContainsKey("cors"))
+        if (query.Cors is not null)
         {
-            var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
+            var doc = await XDocument.LoadAsync(context.Request.Body, LoadOptions.None, context.RequestAborted);
             var rules = ParseCorsConfiguration(doc);
             await storage.PutBucketCorsAsync(bucket, rules);
             return Results.Ok();
         }
-        if (query.ContainsKey("versioning") || query.ContainsKey("lifecycle") ||
-            query.ContainsKey("policy") || query.ContainsKey("logging") ||
-            query.ContainsKey("notification") || query.ContainsKey("encryption"))
+        if (query.Versioning is not null || query.Lifecycle is not null || query.Policy is not null ||
+            query.Logging is not null || query.Notification is not null || query.Encryption is not null)
         {
             return Results.Ok();
         }
@@ -154,7 +213,9 @@ public static class S3Endpoints
 
     // ===== Bucket HEAD =====
 
-    private static async Task<IResult> HandleBucketHead(string bucket, IStorageService storage)
+    private static async Task<IResult> HandleBucketHead(
+        string bucket,
+        IStorageService storage)
     {
         var exists = await storage.BucketExistsAsync(bucket);
         return exists ? Results.Ok() : Results.NotFound();
@@ -163,16 +224,16 @@ public static class S3Endpoints
     // ===== Bucket DELETE =====
 
     private static async Task<IResult> HandleBucketDelete(
-        string bucket, HttpContext ctx, IStorageService storage)
+        string bucket,
+        [AsParameters] BucketDeleteQuery query,
+        IStorageService storage)
     {
-        var query = ctx.Request.Query;
-
-        if (query.ContainsKey("tagging"))
+        if (query.Tagging is not null)
         {
             await storage.DeleteBucketTagsAsync(bucket);
             return Results.NoContent();
         }
-        if (query.ContainsKey("cors"))
+        if (query.Cors is not null)
         {
             await storage.DeleteBucketCorsAsync(bucket);
             return Results.NoContent();
@@ -185,11 +246,14 @@ public static class S3Endpoints
     // ===== Bucket POST (DeleteObjects) =====
 
     private static async Task<IResult> HandleBucketPost(
-        string bucket, HttpContext ctx, IStorageService storage)
+        HttpContext context,
+        string bucket,
+        [AsParameters] BucketPostQuery query,
+        IStorageService storage)
     {
-        if (ctx.Request.Query.ContainsKey("delete"))
+        if (query.Delete is not null)
         {
-            var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
+            var doc = await XDocument.LoadAsync(context.Request.Body, LoadOptions.None, context.RequestAborted);
             var keys = ParseDeleteObjects(doc);
             var results = await storage.DeleteObjectsAsync(bucket, keys);
             return Xml(BuildDeleteResult(results));
@@ -200,30 +264,31 @@ public static class S3Endpoints
     // ===== Object GET =====
 
     private static async Task<IResult> HandleObjectGet(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        HttpContext context,
+        string bucket,
+        string key,
+        [AsParameters] ObjectGetQuery query,
+        IStorageService storage)
     {
-        var query = ctx.Request.Query;
-
-        if (query.ContainsKey("tagging"))
+        if (query.Tagging is not null)
         {
             var tags = await storage.GetObjectTagsAsync(bucket, key);
             return Xml(BuildTagging(tags));
         }
-        if (query.ContainsKey("acl"))
+        if (query.Acl is not null)
         {
-            var acl = await storage.GetObjectAclAsync(bucket, key);
-            return Xml(BuildAccessControlPolicy(acl));
+            var aclValue = await storage.GetObjectAclAsync(bucket, key);
+            return Xml(BuildAccessControlPolicy(aclValue));
         }
-        if (query.TryGetValue("uploadId", out var objectGetUploadIdValues))
+        if (query.UploadId is not null)
         {
-            var uploadId = objectGetUploadIdValues.First()!;
-            var parts = await storage.ListPartsAsync(uploadId);
+            var parts = await storage.ListPartsAsync(query.UploadId);
             return Xml(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.ListPartsResult,
                     new XElement(S3Names.Bucket, bucket),
                     new XElement(S3Names.Key, key),
-                    new XElement(S3Names.UploadId, uploadId),
+                    new XElement(S3Names.UploadId, query.UploadId),
                     parts.Select(p => new XElement(S3Names.Part,
                         new XElement(S3Names.PartNumber, p.PartNumber),
                         new XElement(S3Names.ETag, p.ETag),
@@ -232,7 +297,7 @@ public static class S3Endpoints
         }
 
         var options = new GetObjectOptions();
-        var headers = ctx.Request.Headers;
+        var headers = context.Request.Headers;
 
         if (headers.TryGetValue("Range", out var rangeValues))
         {
@@ -269,54 +334,55 @@ public static class S3Endpoints
 
         await using var data = await storage.GetObjectAsync(bucket, key, options);
 
-        ctx.Response.ContentType = data.Head.ContentType;
-        ctx.Response.ContentLength = data.Head.ContentLength;
-        ctx.Response.Headers["ETag"] = data.Head.ETag;
-        ctx.Response.Headers["Last-Modified"] = data.Head.LastModified.ToString("R");
+        context.Response.ContentType = data.Head.ContentType;
+        context.Response.ContentLength = data.Head.ContentLength;
+        context.Response.Headers["ETag"] = data.Head.ETag;
+        context.Response.Headers["Last-Modified"] = data.Head.LastModified.ToString("R");
         if (data.Head.VersionId is not null)
         {
-            ctx.Response.Headers["x-amz-version-id"] = data.Head.VersionId;
+            context.Response.Headers["x-amz-version-id"] = data.Head.VersionId;
         }
 
         foreach (var (k, v) in data.Head.UserMetadata)
         {
-            ctx.Response.Headers[$"x-amz-meta-{k}"] = v;
+            context.Response.Headers[$"x-amz-meta-{k}"] = v;
         }
 
-        await data.Content.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
+        await data.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
         return Results.Empty;
     }
 
     // ===== Object PUT =====
 
     private static async Task<IResult> HandleObjectPut(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        HttpContext context,
+        string bucket,
+        string key,
+        [AsParameters] ObjectPutQuery query,
+        IStorageService storage)
     {
-        var query = ctx.Request.Query;
-        var headers = ctx.Request.Headers;
+        var headers = context.Request.Headers;
 
-        if (query.ContainsKey("tagging"))
+        if (query.Tagging is not null)
         {
-            var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
+            var doc = await XDocument.LoadAsync(context.Request.Body, LoadOptions.None, context.RequestAborted);
             var tags = ParseTagging(doc);
             await storage.PutObjectTagsAsync(bucket, key, tags);
             return Results.Ok();
         }
-        if (query.ContainsKey("acl"))
+        if (query.Acl is not null)
         {
-            var acl = headers["x-amz-acl"].FirstOrDefault() ?? "private";
-            await storage.PutObjectAclAsync(bucket, key, acl);
+            var aclValue = headers["x-amz-acl"].FirstOrDefault() ?? "private";
+            await storage.PutObjectAclAsync(bucket, key, aclValue);
             return Results.Ok();
         }
 
         // UploadPart
-        if (query.TryGetValue("partNumber", out var partNumberValues) && query.TryGetValue("uploadId", out var putUploadIdValues))
+        if (query.PartNumber is not null && query.UploadId is not null)
         {
-            var uploadId = putUploadIdValues.First()!;
-            var partNumber = Int32.Parse(partNumberValues.First()!, CultureInfo.InvariantCulture);
-            var partBody = GetBodyStream(ctx);
-            var partResult = await storage.UploadPartAsync(uploadId, partNumber, partBody);
-            ctx.Response.Headers["ETag"] = partResult.ETag;
+            var partBody = GetBodyStream(context);
+            var partResult = await storage.UploadPartAsync(query.UploadId, query.PartNumber.Value, partBody);
+            context.Response.Headers["ETag"] = partResult.ETag;
             return Results.Ok();
         }
 
@@ -329,9 +395,9 @@ public static class S3Endpoints
             {
                 copySource = copySource[1..];
             }
-            var slashIdx = copySource.IndexOf('/', StringComparison.Ordinal);
-            var srcBucket = copySource[..slashIdx];
-            var srcKey = copySource[(slashIdx + 1)..];
+            var slashIndex = copySource.IndexOf('/', StringComparison.Ordinal);
+            var srcBucket = copySource[..slashIndex];
+            var srcKey = copySource[(slashIndex + 1)..];
 
             var directive = headers["x-amz-metadata-directive"].FirstOrDefault() ?? "COPY";
             var copyOptions = new CopyObjectOptions { MetadataDirective = directive };
@@ -354,33 +420,36 @@ public static class S3Endpoints
 
         // PutObject
         var putOptions = ExtractPutOptions(headers);
-        var bodyStream = GetBodyStream(ctx);
+        var bodyStream = GetBodyStream(context);
         var putResult = await storage.PutObjectAsync(bucket, key, bodyStream, putOptions);
-        ctx.Response.Headers["ETag"] = putResult.ETag;
-        ctx.Response.Headers["x-amz-version-id"] = putResult.VersionId;
+        context.Response.Headers["ETag"] = putResult.ETag;
+        context.Response.Headers["x-amz-version-id"] = putResult.VersionId;
         return Results.Ok();
     }
 
     // ===== Object HEAD =====
 
     private static async Task<IResult> HandleObjectHead(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        HttpContext context,
+        string bucket,
+        string key,
+        IStorageService storage)
     {
         var head = await storage.HeadObjectAsync(bucket, key);
 
-        ctx.Response.ContentType = head.ContentType;
-        ctx.Response.ContentLength = head.ContentLength;
-        ctx.Response.Headers["ETag"] = head.ETag;
-        ctx.Response.Headers["Last-Modified"] = head.LastModified.ToString("R");
-        ctx.Response.Headers["x-amz-storage-class"] = head.StorageClass;
+        context.Response.ContentType = head.ContentType;
+        context.Response.ContentLength = head.ContentLength;
+        context.Response.Headers["ETag"] = head.ETag;
+        context.Response.Headers["Last-Modified"] = head.LastModified.ToString("R");
+        context.Response.Headers["x-amz-storage-class"] = head.StorageClass;
         if (head.VersionId is not null)
         {
-            ctx.Response.Headers["x-amz-version-id"] = head.VersionId;
+            context.Response.Headers["x-amz-version-id"] = head.VersionId;
         }
 
         foreach (var (k, v) in head.UserMetadata)
         {
-            ctx.Response.Headers[$"x-amz-meta-{k}"] = v;
+            context.Response.Headers[$"x-amz-meta-{k}"] = v;
         }
 
         return Results.Empty;
@@ -389,19 +458,19 @@ public static class S3Endpoints
     // ===== Object DELETE =====
 
     private static async Task<IResult> HandleObjectDelete(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        string bucket,
+        string key,
+        [AsParameters] ObjectDeleteQuery query,
+        IStorageService storage)
     {
-        var query = ctx.Request.Query;
-
-        if (query.ContainsKey("tagging"))
+        if (query.Tagging is not null)
         {
             await storage.DeleteObjectTagsAsync(bucket, key);
             return Results.NoContent();
         }
-        if (query.TryGetValue("uploadId", out var deleteUploadIdValues))
+        if (query.UploadId is not null)
         {
-            var uploadId = deleteUploadIdValues.First()!;
-            await storage.AbortMultipartUploadAsync(uploadId);
+            await storage.AbortMultipartUploadAsync(query.UploadId);
             return Results.NoContent();
         }
 
@@ -412,28 +481,29 @@ public static class S3Endpoints
     // ===== Object POST =====
 
     private static async Task<IResult> HandleObjectPost(
-        string bucket, string key, HttpContext ctx, IStorageService storage)
+        HttpContext context,
+        string bucket,
+        string key,
+        [AsParameters] ObjectPostQuery query,
+        IStorageService storage)
     {
-        var query = ctx.Request.Query;
-
-        if (query.ContainsKey("uploads"))
+        if (query.Uploads is not null)
         {
-            var options = ExtractPutOptions(ctx.Request.Headers);
-            var uploadId = await storage.CreateMultipartUploadAsync(bucket, key, options);
+            var options = ExtractPutOptions(context.Request.Headers);
+            var newUploadId = await storage.CreateMultipartUploadAsync(bucket, key, options);
             return Xml(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.InitiateMultipartUploadResult,
                     new XElement(S3Names.Bucket, bucket),
                     new XElement(S3Names.Key, key),
-                    new XElement(S3Names.UploadId, uploadId))));
+                    new XElement(S3Names.UploadId, newUploadId))));
         }
 
-        if (query.TryGetValue("uploadId", out var postUploadIdValues))
+        if (query.UploadId is not null)
         {
-            var uploadId = postUploadIdValues.First()!;
-            var doc = await XDocument.LoadAsync(ctx.Request.Body, LoadOptions.None, ctx.RequestAborted);
+            var doc = await XDocument.LoadAsync(context.Request.Body, LoadOptions.None, context.RequestAborted);
             var parts = ParseCompleteMultipartUpload(doc);
-            var result = await storage.CompleteMultipartUploadAsync(uploadId, parts);
+            var result = await storage.CompleteMultipartUploadAsync(query.UploadId, parts);
             return Xml(new XDocument(
                 new XDeclaration("1.0", "UTF-8", null),
                 new XElement(S3Names.CompleteMultipartUploadResult,
@@ -630,19 +700,19 @@ public static class S3Endpoints
 
     // ===== Request helpers =====
 
-    private static Stream GetBodyStream(HttpContext ctx)
+    private static Stream GetBodyStream(HttpContext context)
     {
-        var headers = ctx.Request.Headers;
+        var headers = context.Request.Headers;
         var contentEncoding = headers["Content-Encoding"].FirstOrDefault() ?? string.Empty;
         var contentSha256 = headers["x-amz-content-sha256"].FirstOrDefault() ?? string.Empty;
 
         if (contentEncoding.Contains("aws-chunked", StringComparison.OrdinalIgnoreCase) ||
             contentSha256.StartsWith("STREAMING-", StringComparison.OrdinalIgnoreCase))
         {
-            return new ChunkedStream(ctx.Request.Body);
+            return new ChunkedStream(context.Request.Body);
         }
 
-        return ctx.Request.Body;
+        return context.Request.Body;
     }
 
     private static PutObjectOptions ExtractPutOptions(IHeaderDictionary headers)
