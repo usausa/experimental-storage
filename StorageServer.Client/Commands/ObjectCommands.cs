@@ -182,12 +182,12 @@ public sealed class ListObjectsCommand : ICommandHandler
             }
         }
 
-        foreach (var obj in response.S3Objects)
+        foreach (var obj in response.S3Objects ?? [])
         {
             Console.WriteLine($"  {obj.Key} ({obj.Size} bytes)");
         }
 
-        Console.WriteLine($"Total: {response.S3Objects.Count} objects");
+        Console.WriteLine($"Total: {response.S3Objects?.Count ?? 0} objects");
     }
 }
 
