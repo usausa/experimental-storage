@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,8 +6,14 @@
     <CodeAnalysisRuleSet>..\Analyzers.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.19.4" />
+    <PackageReference Include="System.CommandLine" Version="2.0.5" />
+    <PackageReference Include="Usa.Smart.CommandLine.Hosting" Version="2.3.1" />
   </ItemGroup>
 
 </Project>
