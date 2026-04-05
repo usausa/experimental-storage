@@ -4,17 +4,6 @@ S3-compatible local object storage server built with ASP.NET Core (.NET 10) and 
 Provides an S3-compatible REST API and a web management UI.  
 Designed for development and testing — point your AWS SDK at this server instead of AWS S3.
 
-## Web UI
-
-Blazor Server management UI.
-
-| Path | Screen |
-|---|---|
-| `/` | Dashboard — bucket list, create, delete, tags |
-| `/browse/{bucket}` | File browser — upload, delete, preview, metadata, versioning |
-
-<img src="Document/webui.png" title="Web UI" width="50%">
-
 ## S3 API Compatibility
 
 **Legend:** ✅ Supported ⚠️ Stub ❌ Not supported
@@ -106,6 +95,17 @@ Blazor Server management UI.
 | S3 Object Lambda | ❌ | Not applicable |
 | S3 Batch Operations | ❌ | Not implemented |
 | S3 Inventory | ❌ | Not implemented |
+
+## Web UI
+
+Blazor Server management UI.
+
+| Path | Screen |
+|---|---|
+| `/` | Dashboard — bucket list, create, delete, tags |
+| `/browse/{bucket}` | File browser — upload, delete, preview, metadata, versioning |
+
+<img src="Document/webui.png" title="Web UI" width="50%">
 
 ## Documentation
 
