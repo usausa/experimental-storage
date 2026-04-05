@@ -1,8 +1,9 @@
 namespace StorageServer.Middleware;
 
 using System.Globalization;
+using System.Xml.Linq;
+using StorageServer.Consts;
 
-using StorageServer.Helpers;
 using StorageServer.Storage;
 
 /// <summary>
@@ -37,15 +38,35 @@ public sealed class S3Middleware(RequestDelegate next)
         }
         catch (StorageException ex) when (!context.Response.HasStarted)
         {
-            var result = S3Helper.ToS3Error(ex, requestId);
+            var result = ToS3Error(ex, requestId);
             await result.ExecuteAsync(context);
         }
+    }
+
+    private static IResult ToS3Error(StorageException ex, string requestId)
+    {
+        if (ex is NotModifiedException)
+        {
+            return Results.StatusCode(304);
+        }
+
+        var doc = new XDocument(
+            new XDeclaration("1.0", "UTF-8", null),
+            new XElement(S3Names.Error,
+                new XElement(S3Names.Code, ex.ErrorCode),
+                new XElement(S3Names.Message, ex.Message),
+                new XElement(S3Names.RequestId, requestId)));
+
+        return Results.Content(
+            doc.Declaration + doc.ToString(),
+            "application/xml",
+            statusCode: ex.HttpStatusCode);
     }
 
     private static async Task ApplyCorsAsync(HttpContext context, IStorageService storageService)
     {
         var origin = context.Request.Headers.Origin.FirstOrDefault();
-        if (string.IsNullOrEmpty(origin))
+        if (String.IsNullOrEmpty(origin))
         {
             return;
         }
@@ -66,14 +87,14 @@ public sealed class S3Middleware(RequestDelegate next)
             foreach (var rule in corsRules)
             {
                 var originMatch = rule.AllowedOrigins.Any(o =>
-                    o == "*" || string.Equals(o, origin, StringComparison.OrdinalIgnoreCase));
+                    o == "*" || String.Equals(o, origin, StringComparison.OrdinalIgnoreCase));
                 if (!originMatch)
                 {
                     continue;
                 }
 
                 var methodMatch = rule.AllowedMethods.Any(m =>
-                    m == "*" || string.Equals(m, method, StringComparison.OrdinalIgnoreCase));
+                    m == "*" || String.Equals(m, method, StringComparison.OrdinalIgnoreCase));
                 if (!methodMatch && !HttpMethods.IsOptions(context.Request.Method))
                 {
                     continue;
@@ -83,17 +104,17 @@ public sealed class S3Middleware(RequestDelegate next)
 
                 if (rule.AllowedMethods.Count > 0)
                 {
-                    context.Response.Headers["Access-Control-Allow-Methods"] = string.Join(", ", rule.AllowedMethods);
+                    context.Response.Headers["Access-Control-Allow-Methods"] = String.Join(", ", rule.AllowedMethods);
                 }
 
                 if (rule.AllowedHeaders.Count > 0)
                 {
-                    context.Response.Headers["Access-Control-Allow-Headers"] = string.Join(", ", rule.AllowedHeaders);
+                    context.Response.Headers["Access-Control-Allow-Headers"] = String.Join(", ", rule.AllowedHeaders);
                 }
 
                 if (rule.ExposeHeaders.Count > 0)
                 {
-                    context.Response.Headers["Access-Control-Expose-Headers"] = string.Join(", ", rule.ExposeHeaders);
+                    context.Response.Headers["Access-Control-Expose-Headers"] = String.Join(", ", rule.ExposeHeaders);
                 }
 
                 if (rule.MaxAgeSeconds > 0)
@@ -110,9 +131,9 @@ public sealed class S3Middleware(RequestDelegate next)
                 break;
             }
         }
-        catch (StorageException ex) when (string.Equals(ex.ErrorCode, "NoSuchCORSConfiguration", StringComparison.Ordinal))
+        catch (StorageException ex) when (String.Equals(ex.ErrorCode, "NoSuchCORSConfiguration", StringComparison.Ordinal))
         {
-            // No CORS config — proceed without CORS headers
+            // No CORS config
         }
     }
 }

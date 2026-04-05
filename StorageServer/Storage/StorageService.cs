@@ -2,6 +2,7 @@ namespace StorageServer.Storage;
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +15,14 @@ using StorageServer.Storage.Models;
 
 public sealed class StorageService : IStorageService
 {
+    private static readonly Meter StorageMeter = new("StorageServer.Storage");
+
+    private readonly ActivitySource activitySource = new("StorageServer.Storage");
+
+    private readonly Counter<long> putCounter;
+    private readonly Counter<long> getCounter;
+    private readonly Counter<long> deleteCounter;
+
     private static readonly FileExtensionContentTypeProvider ContentTypeProvider = new();
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -22,18 +31,12 @@ public sealed class StorageService : IStorageService
         WriteIndented = true
     };
 
-    private static readonly Random Rng = new();
+    private static readonly Random Random = new();
 
-    private readonly string basePath;
     private readonly string bucketsPath;
     private readonly string multipartPath;
     private readonly StorageOptions options;
     private readonly ILogger<StorageService> logger;
-    private readonly ActivitySource activitySource = new("StorageServer.Storage");
-    private static readonly Meter StorageMeter = new("StorageServer.Storage");
-    private readonly Counter<long> putCounter;
-    private readonly Counter<long> getCounter;
-    private readonly Counter<long> deleteCounter;
 
     public StorageService(
         IOptions<StorageOptions> options,
@@ -42,7 +45,7 @@ public sealed class StorageService : IStorageService
         this.options = options.Value;
         this.logger = logger;
 
-        basePath = Path.GetFullPath(this.options.BasePath);
+        var basePath = Path.GetFullPath(this.options.BasePath);
         bucketsPath = Path.Combine(basePath, "buckets");
         multipartPath = Path.Combine(basePath, "multipart");
 
@@ -122,7 +125,7 @@ public sealed class StorageService : IStorageService
     //  Bucket operations
     // ================================================================
 
-    public Task<IReadOnlyList<BucketInfo>> ListBucketsAsync(CancellationToken ct = default)
+    public async ValueTask<IReadOnlyList<BucketInfo>> ListBucketsAsync(CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("ListBuckets");
 
@@ -137,7 +140,7 @@ public sealed class StorageService : IStorageService
                 DateTimeOffset created = new DirectoryInfo(dir).CreationTimeUtc;
                 if (File.Exists(bucketInfoPath))
                 {
-                    var json = File.ReadAllText(bucketInfoPath);
+                    var json = await File.ReadAllTextAsync(bucketInfoPath, token);
                     var stored = JsonSerializer.Deserialize<BucketInfo>(json, JsonOpts);
                     if (stored is not null)
                     {
@@ -148,10 +151,10 @@ public sealed class StorageService : IStorageService
             }
         }
 
-        return Task.FromResult<IReadOnlyList<BucketInfo>>(results);
+        return results;
     }
 
-    public Task CreateBucketAsync(string bucket, CancellationToken ct = default)
+    public async ValueTask CreateBucketAsync(string bucket, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("CreateBucket");
         activity?.SetTag("bucket", bucket);
@@ -169,21 +172,21 @@ public sealed class StorageService : IStorageService
         Directory.CreateDirectory(bucketMetaDir);
 
         var bucketInfo = new BucketInfo(bucket, DateTimeOffset.UtcNow);
-        File.WriteAllText(
+        await File.WriteAllTextAsync(
             Path.Combine(bucketMetaDir, "_bucket.json"),
-            JsonSerializer.Serialize(bucketInfo, JsonOpts));
+            JsonSerializer.Serialize(bucketInfo, JsonOpts),
+            token);
 
         logger.LogInformation("Created bucket {Bucket}", bucket);
-        return Task.CompletedTask;
     }
 
-    public Task<bool> BucketExistsAsync(string bucket, CancellationToken ct = default)
+    public ValueTask<bool> BucketExistsAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
-        return Task.FromResult(Directory.Exists(ResolveBucketDataPath(bucket)));
+        return ValueTask.FromResult(Directory.Exists(ResolveBucketDataPath(bucket)));
     }
 
-    public Task DeleteBucketAsync(string bucket, bool force = false, CancellationToken ct = default)
+    public ValueTask DeleteBucketAsync(string bucket, bool force = false, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("DeleteBucket");
         activity?.SetTag("bucket", bucket);
@@ -203,10 +206,10 @@ public sealed class StorageService : IStorageService
         Directory.Delete(bucketDir, recursive: true);
 
         logger.LogInformation("Deleted bucket {Bucket} (force={Force})", bucket, force);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public Task<BucketInfo> GetBucketInfoAsync(string bucket, CancellationToken ct = default)
+    public async ValueTask<BucketInfo> GetBucketInfoAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         var bucketDir = ResolveBucketRootPath(bucket);
@@ -218,19 +221,19 @@ public sealed class StorageService : IStorageService
         var bucketInfoPath = Path.Combine(ResolveBucketMetaDir(bucket), "_bucket.json");
         if (File.Exists(bucketInfoPath))
         {
-            var json = File.ReadAllText(bucketInfoPath);
+            var json = await File.ReadAllTextAsync(bucketInfoPath, token);
             var info = JsonSerializer.Deserialize<BucketInfo>(json, JsonOpts);
             if (info is not null)
             {
-                return Task.FromResult(info);
+                return info;
             }
         }
 
         var dirInfo = new DirectoryInfo(bucketDir);
-        return Task.FromResult(new BucketInfo(bucket, dirInfo.CreationTimeUtc));
+        return new BucketInfo(bucket, dirInfo.CreationTimeUtc);
     }
 
-    public Task<BucketStats> GetBucketStatsAsync(string bucket, CancellationToken ct = default)
+    public ValueTask<BucketStats> GetBucketStatsAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         var bucketPath = ResolveBucketDataPath(bucket);
@@ -255,7 +258,7 @@ public sealed class StorageService : IStorageService
             }
         }
 
-        return Task.FromResult(new BucketStats
+        return ValueTask.FromResult(new BucketStats
         {
             Bucket = bucket,
             ObjectCount = objectCount,
@@ -268,7 +271,7 @@ public sealed class StorageService : IStorageService
     //  Object operations
     // ================================================================
 
-    public Task<ListObjectsResult> ListObjectsAsync(string bucket, ListObjectsOptions options, CancellationToken ct = default)
+    public async ValueTask<ListObjectsResult> ListObjectsAsync(string bucket, ListObjectsOptions options, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("ListObjects");
         activity?.SetTag("bucket", bucket);
@@ -285,7 +288,7 @@ public sealed class StorageService : IStorageService
         var maxKeys = options.MaxKeys;
 
         var startAfter = options.StartAfter;
-        if (!string.IsNullOrEmpty(options.ContinuationToken))
+        if (!String.IsNullOrEmpty(options.ContinuationToken))
         {
             startAfter = Encoding.UTF8.GetString(Convert.FromBase64String(options.ContinuationToken));
         }
@@ -296,9 +299,9 @@ public sealed class StorageService : IStorageService
             .Where(k => k.StartsWith(prefix, StringComparison.Ordinal))
             .OrderBy(k => k, StringComparer.Ordinal);
 
-        if (!string.IsNullOrEmpty(startAfter))
+        if (!String.IsNullOrEmpty(startAfter))
         {
-            allKeys = allKeys.Where(k => string.Compare(k, startAfter, StringComparison.Ordinal) > 0);
+            allKeys = allKeys.Where(k => String.Compare(k, startAfter, StringComparison.Ordinal) > 0);
         }
 
         var objects = new List<ObjectSummary>();
@@ -314,7 +317,7 @@ public sealed class StorageService : IStorageService
                 break;
             }
 
-            if (!string.IsNullOrEmpty(delimiter))
+            if (!String.IsNullOrEmpty(delimiter))
             {
                 var remaining = key[prefix.Length..];
                 var delimiterIndex = remaining.IndexOf(delimiter, StringComparison.Ordinal);
@@ -327,7 +330,7 @@ public sealed class StorageService : IStorageService
 
             var filePath = ResolveObjectDataPath(bucket, key);
             var info = new FileInfo(filePath);
-            var meta = LoadStoredMeta(bucket, key);
+            var meta = await LoadStoredMetaAsync(bucket, key, token);
 
             objects.Add(new ObjectSummary
             {
@@ -346,17 +349,17 @@ public sealed class StorageService : IStorageService
             nextToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(lastKey));
         }
 
-        return Task.FromResult(new ListObjectsResult
+        return new ListObjectsResult
         {
             Objects = objects,
             CommonPrefixes = commonPrefixes.ToList(),
             IsTruncated = truncated,
             NextContinuationToken = nextToken,
             KeyCount = objects.Count + commonPrefixes.Count
-        });
+        };
     }
 
-    public Task<ObjectHead> HeadObjectAsync(string bucket, string key, CancellationToken ct = default)
+    public async ValueTask<ObjectHead> HeadObjectAsync(string bucket, string key, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("HeadObject");
 
@@ -371,10 +374,10 @@ public sealed class StorageService : IStorageService
         }
 
         var info = new FileInfo(filePath);
-        var meta = LoadStoredMeta(bucket, key);
+        var meta = await LoadStoredMetaAsync(bucket, key, token);
         var etag = ComputeETag(info);
 
-        return Task.FromResult(new ObjectHead
+        return new ObjectHead
         {
             Key = key,
             ContentLength = info.Length,
@@ -385,10 +388,10 @@ public sealed class StorageService : IStorageService
             Acl = meta?.Acl ?? "private",
             VersionId = meta?.VersionId,
             UserMetadata = meta?.UserMetadata ?? []
-        });
+        };
     }
 
-    public async Task<ObjectData> GetObjectAsync(string bucket, string key, GetObjectOptions? options = null, CancellationToken ct = default)
+    public async ValueTask<ObjectData> GetObjectAsync(string bucket, string key, GetObjectOptions? options = null, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("GetObject");
         getCounter.Add(1);
@@ -412,7 +415,7 @@ public sealed class StorageService : IStorageService
             EvaluateConditionalHeaders(etag, lastModified, options);
         }
 
-        var meta = LoadStoredMeta(bucket, key);
+        var meta = await LoadStoredMetaAsync(bucket, key, token);
 
         Stream content;
         long contentLength;
@@ -449,7 +452,7 @@ public sealed class StorageService : IStorageService
         return new ObjectData { Head = head, Content = content };
     }
 
-    public async Task<PutObjectResult> PutObjectAsync(string bucket, string key, Stream data, PutObjectOptions? options = null, CancellationToken ct = default)
+    public async ValueTask<PutObjectResult> PutObjectAsync(string bucket, string key, Stream data, PutObjectOptions? options = null, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("PutObject");
         putCounter.Add(1);
@@ -463,14 +466,14 @@ public sealed class StorageService : IStorageService
 
         if (File.Exists(filePath))
         {
-            await ArchiveCurrentVersionAsync(bucket, key, filePath);
+            await ArchiveCurrentVersionAsync(bucket, key, filePath, token: token);
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
         await using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
         {
-            await data.CopyToAsync(fs, ct);
+            await data.CopyToAsync(fs, token);
         }
 
         var info = new FileInfo(filePath);
@@ -486,7 +489,7 @@ public sealed class StorageService : IStorageService
             ETag = $"\"{etag}\"",
             VersionId = versionId
         };
-        SaveStoredMeta(bucket, key, storedMeta);
+        await SaveStoredMetaAsync(bucket, key, storedMeta, token);
 
         logger.LogDebug("Put object {Bucket}/{Key} versionId={VersionId}", bucket, key, versionId);
 
@@ -497,7 +500,7 @@ public sealed class StorageService : IStorageService
         };
     }
 
-    public async Task DeleteObjectAsync(string bucket, string key, CancellationToken ct = default)
+    public async ValueTask DeleteObjectAsync(string bucket, string key, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("DeleteObject");
         deleteCounter.Add(1);
@@ -510,18 +513,18 @@ public sealed class StorageService : IStorageService
 
         if (File.Exists(filePath))
         {
-            await ArchiveCurrentVersionAsync(bucket, key, filePath, isDeleteMarker: true);
+            await ArchiveCurrentVersionAsync(bucket, key, filePath, isDeleteMarker: true, token: token);
 
             File.Delete(filePath);
             CleanEmptyDirectories(filePath, ResolveBucketDataPath(bucket));
         }
 
-        DeleteStoredMeta(bucket, key);
+        await DeleteStoredMetaAsync(bucket, key);
 
         logger.LogDebug("Deleted object {Bucket}/{Key}", bucket, key);
     }
 
-    public async Task<IReadOnlyList<DeleteObjectResult>> DeleteObjectsAsync(string bucket, IEnumerable<string> keys, CancellationToken ct = default)
+    public async ValueTask<IReadOnlyList<DeleteObjectResult>> DeleteObjectsAsync(string bucket, IEnumerable<string> keys, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("DeleteObjects");
 
@@ -533,7 +536,7 @@ public sealed class StorageService : IStorageService
         {
             try
             {
-                await DeleteObjectAsync(bucket, key, ct);
+                await DeleteObjectAsync(bucket, key, token);
                 results.Add(new DeleteObjectResult
                 {
                     Key = key,
@@ -555,7 +558,7 @@ public sealed class StorageService : IStorageService
         return results;
     }
 
-    public async Task<CopyObjectResult> CopyObjectAsync(string bucket, string key, string sourceBucket, string sourceKey, CopyObjectOptions? options = null, CancellationToken ct = default)
+    public async ValueTask<CopyObjectResult> CopyObjectAsync(string bucket, string key, string sourceBucket, string sourceKey, CopyObjectOptions? options = null, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("CopyObject");
 
@@ -577,23 +580,27 @@ public sealed class StorageService : IStorageService
 
         if (File.Exists(destFilePath))
         {
-            await ArchiveCurrentVersionAsync(bucket, key, destFilePath);
+            await ArchiveCurrentVersionAsync(bucket, key, destFilePath, token: token);
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(destFilePath)!);
-        File.Copy(srcFilePath, destFilePath, overwrite: true);
+        await using (var srcStream = new FileStream(srcFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true))
+        await using (var dstStream = new FileStream(destFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+        {
+            await srcStream.CopyToAsync(dstStream, token);
+        }
 
-        StoredObjectMeta destMeta;
         var directive = options?.MetadataDirective ?? "COPY";
 
-        if (string.Equals(directive, "REPLACE", StringComparison.OrdinalIgnoreCase) && options?.NewMetadata is not null)
+        StoredObjectMeta destMeta;
+        if (String.Equals(directive, "REPLACE", StringComparison.OrdinalIgnoreCase) && options?.NewMetadata is not null)
         {
             var nm = options.NewMetadata;
             destMeta = new StoredObjectMeta
             {
                 ContentType = nm.ContentType ?? ResolveContentType(key),
-                StorageClass = nm.StorageClass ?? "STANDARD",
-                Acl = nm.Acl ?? "private",
+                StorageClass = nm.StorageClass,
+                Acl = nm.Acl,
                 UserMetadata = nm.UserMetadata ?? [],
                 Tags = nm.Tags ?? [],
                 VersionId = versionId
@@ -601,7 +608,7 @@ public sealed class StorageService : IStorageService
         }
         else
         {
-            var srcMeta = LoadStoredMeta(sourceBucket, sourceKey);
+            var srcMeta = await LoadStoredMetaAsync(sourceBucket, sourceKey, token);
             destMeta = new StoredObjectMeta
             {
                 ContentType = srcMeta?.ContentType ?? ResolveContentType(sourceKey),
@@ -616,7 +623,7 @@ public sealed class StorageService : IStorageService
         var info = new FileInfo(destFilePath);
         var etag = ComputeETag(info);
         destMeta.ETag = $"\"{etag}\"";
-        SaveStoredMeta(bucket, key, destMeta);
+        await SaveStoredMetaAsync(bucket, key, destMeta, token);
 
         return new CopyObjectResult
         {
@@ -630,7 +637,7 @@ public sealed class StorageService : IStorageService
     //  Metadata operations
     // ================================================================
 
-    public Task<ObjectMetadata> GetObjectMetadataAsync(string bucket, string key, CancellationToken ct = default)
+    public async ValueTask<ObjectMetadata> GetObjectMetadataAsync(string bucket, string key, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -643,10 +650,10 @@ public sealed class StorageService : IStorageService
         }
 
         var info = new FileInfo(filePath);
-        var meta = LoadStoredMeta(bucket, key);
+        var meta = await LoadStoredMetaAsync(bucket, key, token);
         var etag = ComputeETag(info);
 
-        return Task.FromResult(new ObjectMetadata
+        return new ObjectMetadata
         {
             Key = key,
             ContentType = meta?.ContentType ?? ResolveContentType(key),
@@ -658,10 +665,10 @@ public sealed class StorageService : IStorageService
             VersionId = meta?.VersionId,
             UserMetadata = meta?.UserMetadata ?? [],
             Tags = meta?.Tags ?? []
-        });
+        };
     }
 
-    public Task UpdateObjectMetadataAsync(string bucket, string key, ObjectMetadataPatch patch, CancellationToken ct = default)
+    public async ValueTask UpdateObjectMetadataAsync(string bucket, string key, ObjectMetadataPatch patch, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -673,7 +680,7 @@ public sealed class StorageService : IStorageService
             throw new ObjectNotFoundException(bucket, key);
         }
 
-        var meta = LoadStoredMeta(bucket, key) ?? new StoredObjectMeta
+        var meta = await LoadStoredMetaAsync(bucket, key, token) ?? new StoredObjectMeta
         {
             ContentType = ResolveContentType(key)
         };
@@ -693,15 +700,14 @@ public sealed class StorageService : IStorageService
             meta.Tags = patch.Tags;
         }
 
-        SaveStoredMeta(bucket, key, meta);
-        return Task.CompletedTask;
+        await SaveStoredMetaAsync(bucket, key, meta, token);
     }
 
     // ================================================================
     //  Tag operations - Object
     // ================================================================
 
-    public Task<Dictionary<string, string>> GetObjectTagsAsync(string bucket, string key, CancellationToken ct = default)
+    public async ValueTask<Dictionary<string, string>> GetObjectTagsAsync(string bucket, string key, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -713,11 +719,11 @@ public sealed class StorageService : IStorageService
             throw new ObjectNotFoundException(bucket, key);
         }
 
-        var meta = LoadStoredMeta(bucket, key);
-        return Task.FromResult(meta?.Tags ?? []);
+        var meta = await LoadStoredMetaAsync(bucket, key, token);
+        return meta?.Tags ?? [];
     }
 
-    public Task PutObjectTagsAsync(string bucket, string key, Dictionary<string, string> tags, CancellationToken ct = default)
+    public async ValueTask PutObjectTagsAsync(string bucket, string key, Dictionary<string, string> tags, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -729,16 +735,15 @@ public sealed class StorageService : IStorageService
             throw new ObjectNotFoundException(bucket, key);
         }
 
-        var meta = LoadStoredMeta(bucket, key) ?? new StoredObjectMeta
+        var meta = await LoadStoredMetaAsync(bucket, key, token) ?? new StoredObjectMeta
         {
             ContentType = ResolveContentType(key)
         };
         meta.Tags = tags;
-        SaveStoredMeta(bucket, key, meta);
-        return Task.CompletedTask;
+        await SaveStoredMetaAsync(bucket, key, meta, token);
     }
 
-    public Task DeleteObjectTagsAsync(string bucket, string key, CancellationToken ct = default)
+    public async ValueTask DeleteObjectTagsAsync(string bucket, string key, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -750,21 +755,19 @@ public sealed class StorageService : IStorageService
             throw new ObjectNotFoundException(bucket, key);
         }
 
-        var meta = LoadStoredMeta(bucket, key);
+        var meta = await LoadStoredMetaAsync(bucket, key, token);
         if (meta is not null && meta.Tags.Count > 0)
         {
             meta.Tags = [];
-            SaveStoredMeta(bucket, key, meta);
+            await SaveStoredMetaAsync(bucket, key, meta, token);
         }
-
-        return Task.CompletedTask;
     }
 
     // ================================================================
     //  Tag operations - Bucket
     // ================================================================
 
-    public Task<Dictionary<string, string>> GetBucketTagsAsync(string bucket, CancellationToken ct = default)
+    public async ValueTask<Dictionary<string, string>> GetBucketTagsAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
@@ -772,26 +775,24 @@ public sealed class StorageService : IStorageService
         var path = ResolveBucketMetaFile(bucket, "_tags.json");
         if (!File.Exists(path))
         {
-            return Task.FromResult(new Dictionary<string, string>());
+            return [];
         }
 
-        var json = File.ReadAllText(path);
-        var tags = JsonSerializer.Deserialize<Dictionary<string, string>>(json, JsonOpts) ?? [];
-        return Task.FromResult(tags);
+        var json = await File.ReadAllTextAsync(path, token);
+        return JsonSerializer.Deserialize<Dictionary<string, string>>(json, JsonOpts) ?? [];
     }
 
-    public Task PutBucketTagsAsync(string bucket, Dictionary<string, string> tags, CancellationToken ct = default)
+    public async ValueTask PutBucketTagsAsync(string bucket, Dictionary<string, string> tags, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
 
         var path = ResolveBucketMetaFile(bucket, "_tags.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(tags, JsonOpts));
-        return Task.CompletedTask;
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(tags, JsonOpts), token);
     }
 
-    public Task DeleteBucketTagsAsync(string bucket, CancellationToken ct = default)
+    public ValueTask DeleteBucketTagsAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
@@ -802,12 +803,12 @@ public sealed class StorageService : IStorageService
             File.Delete(path);
         }
 
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     // ================================================================
 
-    public Task<string> GetObjectAclAsync(string bucket, string key, CancellationToken ct = default)
+    public async ValueTask<string> GetObjectAclAsync(string bucket, string key, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -819,11 +820,11 @@ public sealed class StorageService : IStorageService
             throw new ObjectNotFoundException(bucket, key);
         }
 
-        var meta = LoadStoredMeta(bucket, key);
-        return Task.FromResult(meta?.Acl ?? "private");
+        var meta = await LoadStoredMetaAsync(bucket, key, token);
+        return meta?.Acl ?? "private";
     }
 
-    public Task PutObjectAclAsync(string bucket, string key, string acl, CancellationToken ct = default)
+    public async ValueTask PutObjectAclAsync(string bucket, string key, string acl, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
@@ -835,20 +836,19 @@ public sealed class StorageService : IStorageService
             throw new ObjectNotFoundException(bucket, key);
         }
 
-        var meta = LoadStoredMeta(bucket, key) ?? new StoredObjectMeta
+        var meta = await LoadStoredMetaAsync(bucket, key, token) ?? new StoredObjectMeta
         {
             ContentType = ResolveContentType(key)
         };
         meta.Acl = acl;
-        SaveStoredMeta(bucket, key, meta);
-        return Task.CompletedTask;
+        await SaveStoredMetaAsync(bucket, key, meta, token);
     }
 
     // ================================================================
     //  ACL operations - Bucket
     // ================================================================
 
-    public Task<string> GetBucketAclAsync(string bucket, CancellationToken ct = default)
+    public async ValueTask<string> GetBucketAclAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
@@ -856,30 +856,28 @@ public sealed class StorageService : IStorageService
         var path = ResolveBucketMetaFile(bucket, "_acl.json");
         if (!File.Exists(path))
         {
-            return Task.FromResult("private");
+            return "private";
         }
 
-        var json = File.ReadAllText(path);
-        var acl = JsonSerializer.Deserialize<string>(json, JsonOpts) ?? "private";
-        return Task.FromResult(acl);
+        var json = await File.ReadAllTextAsync(path, token);
+        return JsonSerializer.Deserialize<string>(json, JsonOpts) ?? "private";
     }
 
-    public Task PutBucketAclAsync(string bucket, string acl, CancellationToken ct = default)
+    public async ValueTask PutBucketAclAsync(string bucket, string acl, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
 
         var path = ResolveBucketMetaFile(bucket, "_acl.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(acl, JsonOpts));
-        return Task.CompletedTask;
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(acl, JsonOpts), token);
     }
 
     // ================================================================
     //  CORS operations
     // ================================================================
 
-    public Task<IReadOnlyList<CorsRule>> GetBucketCorsAsync(string bucket, CancellationToken ct = default)
+    public async ValueTask<IReadOnlyList<CorsRule>> GetBucketCorsAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
@@ -890,28 +888,27 @@ public sealed class StorageService : IStorageService
             throw new CorsConfigNotFoundException(bucket);
         }
 
-        var json = File.ReadAllText(path);
+        var json = await File.ReadAllTextAsync(path, token);
         var rules = JsonSerializer.Deserialize<List<CorsRule>>(json, JsonOpts) ?? [];
         if (rules.Count == 0)
         {
             throw new CorsConfigNotFoundException(bucket);
         }
 
-        return Task.FromResult<IReadOnlyList<CorsRule>>(rules);
+        return rules;
     }
 
-    public Task PutBucketCorsAsync(string bucket, IReadOnlyList<CorsRule> rules, CancellationToken ct = default)
+    public async ValueTask PutBucketCorsAsync(string bucket, IReadOnlyList<CorsRule> rules, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
 
         var path = ResolveBucketMetaFile(bucket, "_cors.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(rules, JsonOpts));
-        return Task.CompletedTask;
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(rules, JsonOpts), token);
     }
 
-    public Task DeleteBucketCorsAsync(string bucket, CancellationToken ct = default)
+    public ValueTask DeleteBucketCorsAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
@@ -922,14 +919,14 @@ public sealed class StorageService : IStorageService
             File.Delete(path);
         }
 
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     // ================================================================
     //  Multipart upload operations
     // ================================================================
 
-    public Task<string> CreateMultipartUploadAsync(string bucket, string key, PutObjectOptions? options = null, CancellationToken ct = default)
+    public async ValueTask<string> CreateMultipartUploadAsync(string bucket, string key, PutObjectOptions? options = null, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("CreateMultipartUpload");
 
@@ -947,9 +944,10 @@ public sealed class StorageService : IStorageService
             Key = key,
             Initiated = DateTimeOffset.UtcNow
         };
-        File.WriteAllText(
+        await File.WriteAllTextAsync(
             Path.Combine(uploadDir, "_info.json"),
-            JsonSerializer.Serialize(info, JsonOpts));
+            JsonSerializer.Serialize(info, JsonOpts),
+            token);
 
         var meta = new StoredObjectMeta
         {
@@ -959,15 +957,16 @@ public sealed class StorageService : IStorageService
             UserMetadata = options?.UserMetadata ?? [],
             Tags = options?.Tags ?? []
         };
-        File.WriteAllText(
+        await File.WriteAllTextAsync(
             Path.Combine(uploadDir, "_meta.json"),
-            JsonSerializer.Serialize(meta, JsonOpts));
+            JsonSerializer.Serialize(meta, JsonOpts),
+            token);
 
         logger.LogDebug("Created multipart upload {UploadId} for {Bucket}/{Key}", uploadId, bucket, key);
-        return Task.FromResult(uploadId);
+        return uploadId;
     }
 
-    public async Task<UploadPartResult> UploadPartAsync(string uploadId, int partNumber, Stream data, CancellationToken ct = default)
+    public async ValueTask<UploadPartResult> UploadPartAsync(string uploadId, int partNumber, Stream data, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("UploadPart");
 
@@ -981,7 +980,7 @@ public sealed class StorageService : IStorageService
 
         await using (var fs = new FileStream(partPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
         {
-            await data.CopyToAsync(fs, ct);
+            await data.CopyToAsync(fs, token);
         }
 
         var etag = ComputeETag(new FileInfo(partPath));
@@ -991,7 +990,7 @@ public sealed class StorageService : IStorageService
         };
     }
 
-    public async Task<CompleteMultipartResult> CompleteMultipartUploadAsync(string uploadId, IEnumerable<PartInfo> parts, CancellationToken ct = default)
+    public async ValueTask<CompleteMultipartResult> CompleteMultipartUploadAsync(string uploadId, IEnumerable<PartInfo> parts, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("CompleteMultipartUpload");
 
@@ -1007,7 +1006,7 @@ public sealed class StorageService : IStorageService
             throw new MultipartUploadNotFoundException(uploadId);
         }
 
-        var infoJson = await File.ReadAllTextAsync(infoPath, ct);
+        var infoJson = await File.ReadAllTextAsync(infoPath, token);
         var uploadInfo = JsonSerializer.Deserialize<MultipartMeta>(infoJson, JsonOpts)
             ?? throw new MultipartUploadNotFoundException(uploadId);
 
@@ -1019,13 +1018,13 @@ public sealed class StorageService : IStorageService
 
         if (File.Exists(filePath))
         {
-            await ArchiveCurrentVersionAsync(bucket, key, filePath);
+            await ArchiveCurrentVersionAsync(bucket, key, filePath, token: token);
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
         var partNumbers = parts.Select(p => p.PartNumber).OrderBy(n => n).ToList();
-        var partMd5s = new List<byte[]>();
+        var partMd5List = new List<byte[]>();
 
         await using (var output = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
         {
@@ -1037,16 +1036,20 @@ public sealed class StorageService : IStorageService
                     throw new StorageException("InvalidPart", 400, $"Part {partNumber} not found.");
                 }
 
-                var partHash = MD5.HashData(await File.ReadAllBytesAsync(partPath, ct));
-                partMd5s.Add(partHash);
+#pragma warning disable CA5351
+                var partHash = MD5.HashData(await File.ReadAllBytesAsync(partPath, token));
+#pragma warning restore CA5351
+                partMd5List.Add(partHash);
 
                 await using var partStream = new FileStream(partPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
-                await partStream.CopyToAsync(output, ct);
+                await partStream.CopyToAsync(output, token);
             }
         }
 
-        var concatenated = partMd5s.SelectMany(h => h).ToArray();
+        var concatenated = partMd5List.SelectMany(h => h).ToArray();
+#pragma warning disable CA5351
         var compositeHash = MD5.HashData(concatenated);
+#pragma warning restore CA5351
         var compositeEtag = $"\"{Convert.ToHexStringLower(compositeHash)}-{partNumbers.Count}\"";
 
         var versionId = GenerateVersionId();
@@ -1055,13 +1058,13 @@ public sealed class StorageService : IStorageService
         StoredObjectMeta? objMeta = null;
         if (File.Exists(objMetaPath))
         {
-            var metaJson = await File.ReadAllTextAsync(objMetaPath, ct);
+            var metaJson = await File.ReadAllTextAsync(objMetaPath, token);
             objMeta = JsonSerializer.Deserialize<StoredObjectMeta>(metaJson, JsonOpts);
         }
         objMeta ??= new StoredObjectMeta { ContentType = ResolveContentType(key) };
         objMeta.ETag = compositeEtag;
         objMeta.VersionId = versionId;
-        SaveStoredMeta(bucket, key, objMeta);
+        await SaveStoredMetaAsync(bucket, key, objMeta, token);
 
         Directory.Delete(uploadDir, recursive: true);
 
@@ -1076,7 +1079,7 @@ public sealed class StorageService : IStorageService
         };
     }
 
-    public Task AbortMultipartUploadAsync(string uploadId, CancellationToken ct = default)
+    public ValueTask AbortMultipartUploadAsync(string uploadId, CancellationToken token = default)
     {
         var uploadDir = Path.Combine(multipartPath, uploadId);
         if (Directory.Exists(uploadDir))
@@ -1085,10 +1088,10 @@ public sealed class StorageService : IStorageService
         }
 
         logger.LogDebug("Aborted multipart upload {UploadId}", uploadId);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public Task<IReadOnlyList<MultipartUploadInfo>> ListMultipartUploadsAsync(string bucket, CancellationToken ct = default)
+    public async ValueTask<IReadOnlyList<MultipartUploadInfo>> ListMultipartUploadsAsync(string bucket, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         EnsureBucketExists(bucket);
@@ -1105,7 +1108,7 @@ public sealed class StorageService : IStorageService
                     continue;
                 }
 
-                var json = File.ReadAllText(infoPath);
+                var json = await File.ReadAllTextAsync(infoPath, token);
                 var info = JsonSerializer.Deserialize<MultipartMeta>(json, JsonOpts);
                 if (info is null || info.Bucket != bucket)
                 {
@@ -1122,10 +1125,10 @@ public sealed class StorageService : IStorageService
             }
         }
 
-        return Task.FromResult<IReadOnlyList<MultipartUploadInfo>>(results);
+        return results;
     }
 
-    public Task<IReadOnlyList<PartInfo>> ListPartsAsync(string uploadId, CancellationToken ct = default)
+    public ValueTask<IReadOnlyList<PartInfo>> ListPartsAsync(string uploadId, CancellationToken token = default)
     {
         var uploadDir = Path.Combine(multipartPath, uploadId);
         if (!Directory.Exists(uploadDir))
@@ -1137,7 +1140,7 @@ public sealed class StorageService : IStorageService
             .Select(f =>
             {
                 var name = Path.GetFileNameWithoutExtension(f);
-                if (!int.TryParse(name, out var partNumber))
+                if (!Int32.TryParse(name, out var partNumber))
                 {
                     return null;
                 }
@@ -1156,27 +1159,27 @@ public sealed class StorageService : IStorageService
             .Cast<PartInfo>()
             .ToList();
 
-        return Task.FromResult<IReadOnlyList<PartInfo>>(results);
+        return ValueTask.FromResult<IReadOnlyList<PartInfo>>(results);
     }
 
     // ================================================================
     //  Version operations
     // ================================================================
 
-    public Task<IReadOnlyList<VersionInfo>> ListVersionsAsync(string bucket, string key, CancellationToken ct = default)
+    public async ValueTask<IReadOnlyList<VersionInfo>> ListVersionsAsync(string bucket, string key, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
         EnsureBucketExists(bucket);
 
-        var index = LoadVersionIndex(bucket, key);
+        var index = await LoadVersionIndexAsync(bucket, key, token);
         var results = new List<VersionInfo>();
 
         var filePath = ResolveObjectDataPath(bucket, key);
         if (File.Exists(filePath))
         {
             var fi = new FileInfo(filePath);
-            var meta = LoadStoredMeta(bucket, key);
+            var meta = await LoadStoredMetaAsync(bucket, key, token);
             results.Add(new VersionInfo
             {
                 VersionId = meta?.VersionId ?? "current",
@@ -1201,10 +1204,10 @@ public sealed class StorageService : IStorageService
             });
         }
 
-        return Task.FromResult<IReadOnlyList<VersionInfo>>(results);
+        return results;
     }
 
-    public Task<ObjectData> GetObjectVersionAsync(string bucket, string key, string versionId, CancellationToken ct = default)
+    public async ValueTask<ObjectData> GetObjectVersionAsync(string bucket, string key, string versionId, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("GetObjectVersion");
 
@@ -1212,13 +1215,13 @@ public sealed class StorageService : IStorageService
         ValidateObjectKey(key);
         EnsureBucketExists(bucket);
 
-        var meta = LoadStoredMeta(bucket, key);
+        var meta = await LoadStoredMetaAsync(bucket, key, token);
         if (meta?.VersionId == versionId)
         {
-            return GetObjectAsync(bucket, key, ct: ct);
+            return await GetObjectAsync(bucket, key, token: token);
         }
 
-        var index = LoadVersionIndex(bucket, key);
+        var index = await LoadVersionIndexAsync(bucket, key, token);
         var entry = index.Versions.FirstOrDefault(v => v.VersionId == versionId)
             ?? throw new VersionNotFoundException(bucket, key, versionId);
 
@@ -1237,7 +1240,7 @@ public sealed class StorageService : IStorageService
         StoredObjectMeta? versionMeta = null;
         if (File.Exists(versionMetaPath))
         {
-            var json = File.ReadAllText(versionMetaPath);
+            var json = await File.ReadAllTextAsync(versionMetaPath, token);
             versionMeta = JsonSerializer.Deserialize<StoredObjectMeta>(json, JsonOpts);
         }
 
@@ -1257,10 +1260,10 @@ public sealed class StorageService : IStorageService
             UserMetadata = versionMeta?.UserMetadata ?? []
         };
 
-        return Task.FromResult(new ObjectData { Head = head, Content = content });
+        return new ObjectData { Head = head, Content = content };
     }
 
-    public async Task RestoreVersionAsync(string bucket, string key, string versionId, CancellationToken ct = default)
+    public async ValueTask RestoreVersionAsync(string bucket, string key, string versionId, CancellationToken token = default)
     {
         using var activity = activitySource.StartActivity("RestoreVersion");
 
@@ -1268,7 +1271,7 @@ public sealed class StorageService : IStorageService
         ValidateObjectKey(key);
         EnsureBucketExists(bucket);
 
-        var index = LoadVersionIndex(bucket, key);
+        var index = await LoadVersionIndexAsync(bucket, key, token);
         var entry = index.Versions.FirstOrDefault(v => v.VersionId == versionId)
             ?? throw new VersionNotFoundException(bucket, key, versionId);
 
@@ -1287,34 +1290,38 @@ public sealed class StorageService : IStorageService
 
         if (File.Exists(filePath))
         {
-            await ArchiveCurrentVersionAsync(bucket, key, filePath);
+            await ArchiveCurrentVersionAsync(bucket, key, filePath, token: token);
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        File.Copy(versionDataPath, filePath, overwrite: true);
+        await using (var srcStream = new FileStream(versionDataPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true))
+        await using (var dstStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+        {
+            await srcStream.CopyToAsync(dstStream, token);
+        }
 
         var versionMetaPath = ResolveVersionMetaPath(bucket, key, versionId);
         if (File.Exists(versionMetaPath))
         {
-            var json = File.ReadAllText(versionMetaPath);
+            var json = await File.ReadAllTextAsync(versionMetaPath, token);
             var versionMeta = JsonSerializer.Deserialize<StoredObjectMeta>(json, JsonOpts);
             if (versionMeta is not null)
             {
                 versionMeta.VersionId = GenerateVersionId();
-                SaveStoredMeta(bucket, key, versionMeta);
+                await SaveStoredMetaAsync(bucket, key, versionMeta, token);
             }
         }
 
         logger.LogInformation("Restored version {VersionId} of {Bucket}/{Key}", versionId, bucket, key);
     }
 
-    public Task DeleteVersionAsync(string bucket, string key, string versionId, CancellationToken ct = default)
+    public async ValueTask DeleteVersionAsync(string bucket, string key, string versionId, CancellationToken token = default)
     {
         ValidateBucketName(bucket);
         ValidateObjectKey(key);
         EnsureBucketExists(bucket);
 
-        var index = LoadVersionIndex(bucket, key);
+        var index = await LoadVersionIndexAsync(bucket, key, token);
         var entry = index.Versions.FirstOrDefault(v => v.VersionId == versionId)
             ?? throw new VersionNotFoundException(bucket, key, versionId);
 
@@ -1331,24 +1338,22 @@ public sealed class StorageService : IStorageService
         }
 
         index.Versions.Remove(entry);
-        SaveVersionIndex(bucket, key, index);
+        await SaveVersionIndexAsync(bucket, key, index, token);
 
         var versionDir = ResolveVersionDir(bucket, key);
         if (Directory.Exists(versionDir) && !Directory.EnumerateFileSystemEntries(versionDir).Any())
         {
             Directory.Delete(versionDir);
         }
-
-        return Task.CompletedTask;
     }
 
     // ================================================================
     //  Thumbnail
     // ================================================================
 
-    public Task<Stream?> GetThumbnailAsync(string bucket, string key, int maxWidth = 128, int maxHeight = 128, CancellationToken ct = default)
+    public ValueTask<Stream?> GetThumbnailAsync(string bucket, string key, int maxWidth = 128, int maxHeight = 128, CancellationToken token = default)
     {
-        return Task.FromResult<Stream?>(null);
+        return ValueTask.FromResult<Stream?>(null);
     }
 
     // ================================================================
@@ -1463,14 +1468,14 @@ public sealed class StorageService : IStorageService
     //  Object metadata persistence
     // ================================================================
 
-    private void SaveStoredMeta(string bucket, string key, StoredObjectMeta meta)
+    private async ValueTask SaveStoredMetaAsync(string bucket, string key, StoredObjectMeta meta, CancellationToken token)
     {
         var path = ResolveObjectMetaPath(bucket, key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(meta, JsonOpts));
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(meta, JsonOpts), token);
     }
 
-    private StoredObjectMeta? LoadStoredMeta(string bucket, string key)
+    private async ValueTask<StoredObjectMeta?> LoadStoredMetaAsync(string bucket, string key, CancellationToken token)
     {
         var path = ResolveObjectMetaPath(bucket, key);
         if (!File.Exists(path))
@@ -1478,28 +1483,29 @@ public sealed class StorageService : IStorageService
             return null;
         }
 
-        var json = File.ReadAllText(path);
+        var json = await File.ReadAllTextAsync(path, token);
         return JsonSerializer.Deserialize<StoredObjectMeta>(json, JsonOpts);
     }
 
-    private void DeleteStoredMeta(string bucket, string key)
+    private ValueTask DeleteStoredMetaAsync(string bucket, string key)
     {
         var path = ResolveObjectMetaPath(bucket, key);
         if (!File.Exists(path))
         {
-            return;
+            return ValueTask.CompletedTask;
         }
 
         File.Delete(path);
         var objectsDir = Path.Combine(ResolveBucketMetaDir(bucket), "objects");
         CleanEmptyDirectories(path, objectsDir);
+        return ValueTask.CompletedTask;
     }
 
     // ================================================================
     //  Version index persistence
     // ================================================================
 
-    private VersionIndex LoadVersionIndex(string bucket, string key)
+    private async ValueTask<VersionIndex> LoadVersionIndexAsync(string bucket, string key, CancellationToken token)
     {
         var path = ResolveVersionIndexPath(bucket, key);
         if (!File.Exists(path))
@@ -1507,18 +1513,18 @@ public sealed class StorageService : IStorageService
             return new VersionIndex();
         }
 
-        var json = File.ReadAllText(path);
+        var json = await File.ReadAllTextAsync(path, token);
         return JsonSerializer.Deserialize<VersionIndex>(json, JsonOpts) ?? new VersionIndex();
     }
 
-    private void SaveVersionIndex(string bucket, string key, VersionIndex index)
+    private async ValueTask SaveVersionIndexAsync(string bucket, string key, VersionIndex index, CancellationToken token)
     {
         var path = ResolveVersionIndexPath(bucket, key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(index, JsonOpts));
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(index, JsonOpts), token);
     }
 
-    private async Task ArchiveCurrentVersionAsync(string bucket, string key, string currentFilePath, bool isDeleteMarker = false)
+    private async ValueTask ArchiveCurrentVersionAsync(string bucket, string key, string currentFilePath, bool isDeleteMarker = false, CancellationToken token = default)
     {
         var versionId = GenerateVersionId();
         var versionDir = ResolveVersionDir(bucket, key);
@@ -1527,18 +1533,22 @@ public sealed class StorageService : IStorageService
         if (!isDeleteMarker)
         {
             var versionDataPath = Path.Combine(versionDir, $"{versionId}.data");
-            File.Copy(currentFilePath, versionDataPath, overwrite: true);
+            await using (var srcStream = new FileStream(currentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true))
+            await using (var dstStream = new FileStream(versionDataPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            {
+                await srcStream.CopyToAsync(dstStream, token);
+            }
 
-            var currentMeta = LoadStoredMeta(bucket, key);
+            var currentMeta = await LoadStoredMetaAsync(bucket, key, token);
             if (currentMeta is not null)
             {
                 var versionMetaPath = Path.Combine(versionDir, $"{versionId}.meta.json");
-                File.WriteAllText(versionMetaPath, JsonSerializer.Serialize(currentMeta, JsonOpts));
+                await File.WriteAllTextAsync(versionMetaPath, JsonSerializer.Serialize(currentMeta, JsonOpts), token);
             }
         }
 
         var fi = new FileInfo(currentFilePath);
-        var index = LoadVersionIndex(bucket, key);
+        var index = await LoadVersionIndexAsync(bucket, key, token);
         index.Versions.Add(new VersionEntry
         {
             VersionId = versionId,
@@ -1593,7 +1603,7 @@ public sealed class StorageService : IStorageService
             }
         }
 
-        SaveVersionIndex(bucket, key, index);
+        await SaveVersionIndexAsync(bucket, key, index, token);
     }
 
     // ================================================================
@@ -1603,7 +1613,7 @@ public sealed class StorageService : IStorageService
     private static void ValidateBucketName(string bucket)
     {
         ArgumentNullException.ThrowIfNull(bucket);
-        if (string.IsNullOrWhiteSpace(bucket))
+        if (String.IsNullOrWhiteSpace(bucket))
         {
             throw new InvalidBucketNameException(bucket, "Bucket name cannot be empty.");
         }
@@ -1618,12 +1628,12 @@ public sealed class StorageService : IStorageService
             throw new InvalidBucketNameException(bucket, "Bucket name cannot contain '..'.");
         }
 
-        if (bucket.Contains('/'))
+        if (bucket.Contains('/', StringComparison.Ordinal))
         {
             throw new InvalidBucketNameException(bucket, "Bucket name cannot contain '/'.");
         }
 
-        if (bucket.Contains('\\'))
+        if (bucket.Contains('\\', StringComparison.Ordinal))
         {
             throw new InvalidBucketNameException(bucket, "Bucket name cannot contain '\\'.");
         }
@@ -1632,7 +1642,7 @@ public sealed class StorageService : IStorageService
     private static void ValidateObjectKey(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
-        if (string.IsNullOrWhiteSpace(key))
+        if (String.IsNullOrWhiteSpace(key))
         {
             throw new InvalidObjectKeyException(key, "Object key cannot be empty.");
         }
@@ -1657,7 +1667,9 @@ public sealed class StorageService : IStorageService
     private static string ComputeETag(FileInfo info)
     {
         using var stream = info.OpenRead();
+#pragma warning disable CA5351
         var hash = MD5.HashData(stream);
+#pragma warning restore CA5351
         return Convert.ToHexStringLower(hash);
     }
 
@@ -1666,14 +1678,18 @@ public sealed class StorageService : IStorageService
 
     private static string GenerateVersionId()
     {
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ");
+        // ReSharper disable StringLiteralTypo
         const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        // ReSharper restore StringLiteralTypo
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture);
         var randomPart = new char[6];
-        lock (Rng)
+        lock (Random)
         {
             for (var i = 0; i < 6; i++)
             {
-                randomPart[i] = chars[Rng.Next(chars.Length)];
+#pragma warning disable CA5394
+                randomPart[i] = chars[Random.Next(chars.Length)];
+#pragma warning restore CA5394
             }
         }
         return $"v_{timestamp}_{new string(randomPart)}";
@@ -1696,7 +1712,7 @@ public sealed class StorageService : IStorageService
     {
         var quotedEtag = $"\"{etag}\"";
 
-        if (!string.IsNullOrEmpty(options.IfMatch) && options.IfMatch != "*" && options.IfMatch != quotedEtag)
+        if (!String.IsNullOrEmpty(options.IfMatch) && options.IfMatch != "*" && options.IfMatch != quotedEtag)
         {
             throw new PreconditionFailedException($"ETag '{quotedEtag}' does not match If-Match '{options.IfMatch}'.");
         }
@@ -1706,7 +1722,7 @@ public sealed class StorageService : IStorageService
             throw new PreconditionFailedException("Object was modified after If-Unmodified-Since.");
         }
 
-        if (!string.IsNullOrEmpty(options.IfNoneMatch)
+        if (!String.IsNullOrEmpty(options.IfNoneMatch)
             && (options.IfNoneMatch == "*" || options.IfNoneMatch == quotedEtag))
         {
             throw new NotModifiedException();

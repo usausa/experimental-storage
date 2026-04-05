@@ -2,65 +2,71 @@ namespace StorageServer.Storage;
 
 using StorageServer.Storage.Models;
 
-/// <summary>
-/// Provides storage operations for buckets and objects.
-/// </summary>
 public interface IStorageService
 {
     // Bucket operations
-    Task<IReadOnlyList<BucketInfo>> ListBucketsAsync(CancellationToken ct = default);
-    Task CreateBucketAsync(string bucket, CancellationToken ct = default);
-    Task<bool> BucketExistsAsync(string bucket, CancellationToken ct = default);
-    Task DeleteBucketAsync(string bucket, bool force = false, CancellationToken ct = default);
-    Task<BucketInfo> GetBucketInfoAsync(string bucket, CancellationToken ct = default);
-    Task<BucketStats> GetBucketStatsAsync(string bucket, CancellationToken ct = default);
+
+    ValueTask<IReadOnlyList<BucketInfo>> ListBucketsAsync(CancellationToken token = default);
+    ValueTask CreateBucketAsync(string bucket, CancellationToken token = default);
+    ValueTask<bool> BucketExistsAsync(string bucket, CancellationToken token = default);
+    ValueTask DeleteBucketAsync(string bucket, bool force = false, CancellationToken token = default);
+    ValueTask<BucketInfo> GetBucketInfoAsync(string bucket, CancellationToken token = default);
+    ValueTask<BucketStats> GetBucketStatsAsync(string bucket, CancellationToken token = default);
 
     // Object operations
-    Task<ListObjectsResult> ListObjectsAsync(string bucket, ListObjectsOptions options, CancellationToken ct = default);
-    Task<ObjectHead> HeadObjectAsync(string bucket, string key, CancellationToken ct = default);
-    Task<ObjectData> GetObjectAsync(string bucket, string key, GetObjectOptions? options = null, CancellationToken ct = default);
-    Task<PutObjectResult> PutObjectAsync(string bucket, string key, Stream data, PutObjectOptions? options = null, CancellationToken ct = default);
-    Task DeleteObjectAsync(string bucket, string key, CancellationToken ct = default);
-    Task<IReadOnlyList<DeleteObjectResult>> DeleteObjectsAsync(string bucket, IEnumerable<string> keys, CancellationToken ct = default);
-    Task<CopyObjectResult> CopyObjectAsync(string bucket, string key, string sourceBucket, string sourceKey, CopyObjectOptions? options = null, CancellationToken ct = default);
+
+    ValueTask<ListObjectsResult> ListObjectsAsync(string bucket, ListObjectsOptions options, CancellationToken token = default);
+    ValueTask<ObjectHead> HeadObjectAsync(string bucket, string key, CancellationToken token = default);
+    ValueTask<ObjectData> GetObjectAsync(string bucket, string key, GetObjectOptions? options = null, CancellationToken token = default);
+    ValueTask<PutObjectResult> PutObjectAsync(string bucket, string key, Stream data, PutObjectOptions? options = null, CancellationToken token = default);
+    ValueTask DeleteObjectAsync(string bucket, string key, CancellationToken token = default);
+    ValueTask<IReadOnlyList<DeleteObjectResult>> DeleteObjectsAsync(string bucket, IEnumerable<string> keys, CancellationToken token = default);
+    ValueTask<CopyObjectResult> CopyObjectAsync(string bucket, string key, string sourceBucket, string sourceKey, CopyObjectOptions? options = null, CancellationToken token = default);
 
     // Metadata operations
-    Task<ObjectMetadata> GetObjectMetadataAsync(string bucket, string key, CancellationToken ct = default);
-    Task UpdateObjectMetadataAsync(string bucket, string key, ObjectMetadataPatch patch, CancellationToken ct = default);
+
+    ValueTask<ObjectMetadata> GetObjectMetadataAsync(string bucket, string key, CancellationToken token = default);
+    ValueTask UpdateObjectMetadataAsync(string bucket, string key, ObjectMetadataPatch patch, CancellationToken token = default);
 
     // Tag operations
-    Task<Dictionary<string, string>> GetObjectTagsAsync(string bucket, string key, CancellationToken ct = default);
-    Task PutObjectTagsAsync(string bucket, string key, Dictionary<string, string> tags, CancellationToken ct = default);
-    Task DeleteObjectTagsAsync(string bucket, string key, CancellationToken ct = default);
-    Task<Dictionary<string, string>> GetBucketTagsAsync(string bucket, CancellationToken ct = default);
-    Task PutBucketTagsAsync(string bucket, Dictionary<string, string> tags, CancellationToken ct = default);
-    Task DeleteBucketTagsAsync(string bucket, CancellationToken ct = default);
+
+    ValueTask<Dictionary<string, string>> GetObjectTagsAsync(string bucket, string key, CancellationToken token = default);
+    ValueTask PutObjectTagsAsync(string bucket, string key, Dictionary<string, string> tags, CancellationToken token = default);
+    ValueTask DeleteObjectTagsAsync(string bucket, string key, CancellationToken token = default);
+    ValueTask<Dictionary<string, string>> GetBucketTagsAsync(string bucket, CancellationToken token = default);
+    ValueTask PutBucketTagsAsync(string bucket, Dictionary<string, string> tags, CancellationToken token = default);
+    ValueTask DeleteBucketTagsAsync(string bucket, CancellationToken token = default);
 
     // ACL operations
-    Task<string> GetObjectAclAsync(string bucket, string key, CancellationToken ct = default);
-    Task PutObjectAclAsync(string bucket, string key, string acl, CancellationToken ct = default);
-    Task<string> GetBucketAclAsync(string bucket, CancellationToken ct = default);
-    Task PutBucketAclAsync(string bucket, string acl, CancellationToken ct = default);
+
+    ValueTask<string> GetObjectAclAsync(string bucket, string key, CancellationToken token = default);
+    ValueTask PutObjectAclAsync(string bucket, string key, string acl, CancellationToken token = default);
+    ValueTask<string> GetBucketAclAsync(string bucket, CancellationToken token = default);
+    ValueTask PutBucketAclAsync(string bucket, string acl, CancellationToken token = default);
 
     // CORS operations
-    Task<IReadOnlyList<CorsRule>> GetBucketCorsAsync(string bucket, CancellationToken ct = default);
-    Task PutBucketCorsAsync(string bucket, IReadOnlyList<CorsRule> rules, CancellationToken ct = default);
-    Task DeleteBucketCorsAsync(string bucket, CancellationToken ct = default);
+
+    ValueTask<IReadOnlyList<CorsRule>> GetBucketCorsAsync(string bucket, CancellationToken token = default);
+    ValueTask PutBucketCorsAsync(string bucket, IReadOnlyList<CorsRule> rules, CancellationToken token = default);
+    ValueTask DeleteBucketCorsAsync(string bucket, CancellationToken token = default);
 
     // Multipart upload operations
-    Task<string> CreateMultipartUploadAsync(string bucket, string key, PutObjectOptions? options = null, CancellationToken ct = default);
-    Task<UploadPartResult> UploadPartAsync(string uploadId, int partNumber, Stream data, CancellationToken ct = default);
-    Task<CompleteMultipartResult> CompleteMultipartUploadAsync(string uploadId, IEnumerable<PartInfo> parts, CancellationToken ct = default);
-    Task AbortMultipartUploadAsync(string uploadId, CancellationToken ct = default);
-    Task<IReadOnlyList<MultipartUploadInfo>> ListMultipartUploadsAsync(string bucket, CancellationToken ct = default);
-    Task<IReadOnlyList<PartInfo>> ListPartsAsync(string uploadId, CancellationToken ct = default);
+
+    ValueTask<string> CreateMultipartUploadAsync(string bucket, string key, PutObjectOptions? options = null, CancellationToken token = default);
+    ValueTask<UploadPartResult> UploadPartAsync(string uploadId, int partNumber, Stream data, CancellationToken token = default);
+    ValueTask<CompleteMultipartResult> CompleteMultipartUploadAsync(string uploadId, IEnumerable<PartInfo> parts, CancellationToken token = default);
+    ValueTask AbortMultipartUploadAsync(string uploadId, CancellationToken token = default);
+    ValueTask<IReadOnlyList<MultipartUploadInfo>> ListMultipartUploadsAsync(string bucket, CancellationToken token = default);
+    ValueTask<IReadOnlyList<PartInfo>> ListPartsAsync(string uploadId, CancellationToken token = default);
 
     // Version operations
-    Task<IReadOnlyList<VersionInfo>> ListVersionsAsync(string bucket, string key, CancellationToken ct = default);
-    Task<ObjectData> GetObjectVersionAsync(string bucket, string key, string versionId, CancellationToken ct = default);
-    Task RestoreVersionAsync(string bucket, string key, string versionId, CancellationToken ct = default);
-    Task DeleteVersionAsync(string bucket, string key, string versionId, CancellationToken ct = default);
+
+    ValueTask<IReadOnlyList<VersionInfo>> ListVersionsAsync(string bucket, string key, CancellationToken token = default);
+    ValueTask<ObjectData> GetObjectVersionAsync(string bucket, string key, string versionId, CancellationToken token = default);
+    ValueTask RestoreVersionAsync(string bucket, string key, string versionId, CancellationToken token = default);
+    ValueTask DeleteVersionAsync(string bucket, string key, string versionId, CancellationToken token = default);
 
     // Thumbnail
-    Task<Stream?> GetThumbnailAsync(string bucket, string key, int maxWidth = 128, int maxHeight = 128, CancellationToken ct = default);
+
+    ValueTask<Stream?> GetThumbnailAsync(string bucket, string key, int maxWidth = 128, int maxHeight = 128, CancellationToken token = default);
 }

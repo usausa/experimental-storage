@@ -1,10 +1,5 @@
 namespace StorageServer.Helpers;
 
-/// <summary>
-/// Decodes chunked transfer encoding (e.g. AWS aws-chunked) on the fly,
-/// stripping hex chunk sizes and extension headers so that only the raw
-/// payload bytes are yielded to callers.
-/// </summary>
 public sealed class ChunkedStream : Stream
 {
     private readonly Stream inner;
@@ -13,20 +8,30 @@ public sealed class ChunkedStream : Stream
     private int chunkRemaining;
     private bool finished;
 
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => throw new NotSupportedException();
+
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
     public ChunkedStream(Stream inner)
     {
         ArgumentNullException.ThrowIfNull(inner);
         this.inner = inner;
     }
 
-    public override bool CanRead => true;
-    public override bool CanSeek => false;
-    public override bool CanWrite => false;
-    public override long Length => throw new NotSupportedException();
-    public override long Position
+    protected override void Dispose(bool disposing)
     {
-        get => throw new NotSupportedException();
-        set => throw new NotSupportedException();
+        // The inner stream is owned by the request pipeline; do not dispose it.
+        base.Dispose(disposing);
     }
 
     public override void Flush()
@@ -55,7 +60,7 @@ public sealed class ChunkedStream : Stream
         if (chunkRemaining == 0)
         {
             var headerLine = await ReadLineAsync(cancellationToken);
-            if (headerLine == null)
+            if (headerLine is null)
             {
                 finished = true;
                 return 0;
@@ -64,7 +69,7 @@ public sealed class ChunkedStream : Stream
             while (headerLine.Length == 0)
             {
                 headerLine = await ReadLineAsync(cancellationToken);
-                if (headerLine == null)
+                if (headerLine is null)
                 {
                     finished = true;
                     return 0;
@@ -72,7 +77,7 @@ public sealed class ChunkedStream : Stream
             }
 
             // Parse: {hex_size}[;extensions...]
-            var semiIdx = headerLine.IndexOf(';');
+            var semiIdx = headerLine.IndexOf(';', StringComparison.Ordinal);
             var hexPart = semiIdx >= 0 ? headerLine[..semiIdx] : headerLine;
             chunkRemaining = Convert.ToInt32(hexPart, 16);
 
@@ -118,11 +123,5 @@ public sealed class ChunkedStream : Stream
         }
 
         return System.Text.Encoding.ASCII.GetString(lineBuffer, 0, pos);
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        // The inner stream is owned by the request pipeline; do not dispose it.
-        base.Dispose(disposing);
     }
 }

@@ -1,9 +1,14 @@
 namespace StorageServer.Components.Layout;
 
+using Microsoft.AspNetCore.Components;
+
 using StorageServer.Storage;
 
 public partial class MainLayout
 {
+    [Inject]
+    public IStorageService Storage { get; set; } = default!;
+
     private int bucketCount;
     private long totalObjects;
     private long totalSize;

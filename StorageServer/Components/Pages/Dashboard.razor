@@ -1,5 +1,4 @@
 @page "/"
-@inject IStorageService Storage
 @rendermode InteractiveServer
 
 <PageTitle>StorageServer - Buckets</PageTitle>
@@ -18,7 +17,7 @@
             <div class="spinner-se spinner-se-lg" role="status"></div>
         </div>
     }
-    else if (error != null)
+    else if (error is not null)
     {
         <div class="fb-error-toast">
             <i class="bi bi-exclamation-circle"></i>
@@ -87,7 +86,7 @@
                 <input type="text" placeholder="Bucket name"
                        @bind="newBucketName" @bind:event="oninput"
                        @onkeyup="HandleCreateKeyUp" />
-                @if (createError != null)
+                @if (createError is not null)
                 {
                     <p class="fb-modal-warn" style="margin-top: 8px;">@createError</p>
                 }

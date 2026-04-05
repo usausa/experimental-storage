@@ -42,12 +42,12 @@ public class VirtualHostStyleMiddleware(RequestDelegate next, IConfiguration con
         var path = context.Request.Path.Value ?? "/";
 
         if (host.EndsWith("." + baseHostname, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(host, baseHostname, StringComparison.OrdinalIgnoreCase))
+            && !String.Equals(host, baseHostname, StringComparison.OrdinalIgnoreCase))
         {
             var bucket = host[..^(baseHostname.Length + 1)];
             context.Request.Path = $"/storage/{bucket}" + context.Request.Path;
         }
-        else if (string.Equals(host, baseHostname, StringComparison.OrdinalIgnoreCase))
+        else if (String.Equals(host, baseHostname, StringComparison.OrdinalIgnoreCase))
         {
             context.Request.Path = "/storage" + context.Request.Path;
         }

@@ -1,11 +1,8 @@
-namespace StorageServer.Api.Web;
+namespace StorageServer.Endpoints.Api;
 
 using StorageServer.Storage;
 
-/// <summary>
-/// API endpoints for version management from the Web UI.
-/// </summary>
-public static class VersionEndpoints
+public static class VersionEndpoint
 {
     public static void MapVersionEndpoints(this WebApplication app)
     {
@@ -21,7 +18,7 @@ public static class VersionEndpoints
     {
         var versionId = ctx.Request.Query["versionId"].FirstOrDefault();
 
-        if (versionId != null)
+        if (versionId is not null)
         {
             var data = await storage.GetObjectVersionAsync(bucket, key, versionId);
             var fileName = Path.GetFileName(key);
@@ -43,7 +40,7 @@ public static class VersionEndpoints
         }
 
         var versionId = ctx.Request.Query["versionId"].FirstOrDefault();
-        if (versionId == null)
+        if (versionId is null)
         {
             return Results.BadRequest(new { error = "versionId query parameter is required" });
         }
@@ -56,7 +53,7 @@ public static class VersionEndpoints
         string bucket, string key, HttpContext ctx, IStorageService storage)
     {
         var versionId = ctx.Request.Query["versionId"].FirstOrDefault();
-        if (versionId == null)
+        if (versionId is null)
         {
             return Results.BadRequest(new { error = "versionId query parameter is required" });
         }

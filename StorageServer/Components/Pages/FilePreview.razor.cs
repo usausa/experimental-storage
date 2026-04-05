@@ -2,8 +2,13 @@ namespace StorageServer.Components.Pages;
 
 using Microsoft.AspNetCore.Components;
 
+using StorageServer.Storage;
+
 public partial class FilePreview
 {
+    [Inject]
+    public IStorageService Storage { get; set; } = default!;
+
     [Parameter]
     [EditorRequired]
     public string Bucket { get; set; } = string.Empty;
@@ -54,5 +59,5 @@ public partial class FilePreview
     }
 
     private static string EncodeKey(string key) =>
-        string.Join("/", key.Split('/').Select(Uri.EscapeDataString));
+        String.Join("/", key.Split('/').Select(Uri.EscapeDataString));
 }

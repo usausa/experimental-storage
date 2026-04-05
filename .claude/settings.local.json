@@ -20,7 +20,9 @@
       "Bash(mkdir -p css)",
       "Bash(mv app.css css/)",
       "Bash(taskkill /F /IM dotnet.exe)",
-      "Bash(curl -s http://localhost:5020/browse/test)"
+      "Bash(curl -s http://localhost:5020/browse/test)",
+      "Bash(powershell:*)",
+      "Bash(dotnet script:*)"
     ]
   }
 }

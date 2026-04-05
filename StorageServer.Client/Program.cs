@@ -84,7 +84,7 @@ do
         ContinuationToken = continuationToken
     });
     Console.WriteLine($"  Page {page}: " +
-        $"{string.Join(", ", resp.S3Objects.Select(o => o.Key))} " +
+        $"{String.Join(", ", resp.S3Objects.Select(o => o.Key))} " +
         $"(IsTruncated={resp.IsTruncated})");
     continuationToken = resp.IsTruncated == true ? resp.NextContinuationToken : null;
     page++;
@@ -360,16 +360,19 @@ foreach (var o in scList.S3Objects)
 
 // ── 15. ACL ─────────────────────────────────────────────────────
 Console.WriteLine("\n=== ACL ===");
+#pragma warning disable CS0618
 var bucketAcl = await client.GetACLAsync(new GetACLRequest
 {
     BucketName = bucketName
 });
+#pragma warning restore CS0618 // Type or member is obsolete
 Console.WriteLine("  Bucket ACL:");
 foreach (var grant in bucketAcl.AccessControlList.Grants)
 {
     Console.WriteLine($"    {grant.Grantee.Type}: {grant.Permission}");
 }
 
+#pragma warning disable CS0618
 await client.PutACLAsync(new PutACLRequest
 {
     BucketName = bucketName,
@@ -378,6 +381,7 @@ await client.PutACLAsync(new PutACLRequest
 });
 Console.WriteLine("  Set readme.txt ACL to public-read");
 
+#pragma warning disable CS0618
 var objAcl = await client.GetACLAsync(new GetACLRequest
 {
     BucketName = bucketName,
@@ -415,8 +419,8 @@ var corsResp = await client.GetCORSConfigurationAsync(
     new GetCORSConfigurationRequest { BucketName = bucketName });
 foreach (var rule in corsResp.Configuration.Rules)
 {
-    Console.WriteLine($"  Origins: {string.Join(", ", rule.AllowedOrigins)}");
-    Console.WriteLine($"  Methods: {string.Join(", ", rule.AllowedMethods)}");
+    Console.WriteLine($"  Origins: {String.Join(", ", rule.AllowedOrigins)}");
+    Console.WriteLine($"  Methods: {String.Join(", ", rule.AllowedMethods)}");
 }
 
 await client.DeleteCORSConfigurationAsync(
@@ -425,12 +429,12 @@ Console.WriteLine("  CORS configuration deleted");
 
 // ── 17. DeleteObjects (bulk delete) ─────────────────────────────
 Console.WriteLine("\n=== Bulk Delete ===");
-var allObjs = await client.ListObjectsV2Async(
+var allObjects = await client.ListObjectsV2Async(
     new ListObjectsV2Request { BucketName = bucketName });
 var delResp = await client.DeleteObjectsAsync(new DeleteObjectsRequest
 {
     BucketName = bucketName,
-    Objects = allObjs.S3Objects.Select(o => new KeyVersion { Key = o.Key }).ToList()
+    Objects = allObjects.S3Objects.Select(o => new KeyVersion { Key = o.Key }).ToList()
 });
 Console.WriteLine($"  Deleted {delResp.DeletedObjects.Count} objects");
 

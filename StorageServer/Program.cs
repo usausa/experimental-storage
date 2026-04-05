@@ -1,6 +1,6 @@
-using StorageServer.Api.S3;
-using StorageServer.Api.Web;
 using StorageServer.Components;
+using StorageServer.Endpoints.Api;
+using StorageServer.Endpoints.S3;
 using StorageServer.Middleware;
 using StorageServer.Storage;
 
@@ -34,7 +34,6 @@ app.MapStaticAssets();
 
 // S3 API: /storage/*
 app.MapS3Endpoints();
-
 // Web UI API: /api/*
 app.MapFileEndpoints();
 app.MapVersionEndpoints();

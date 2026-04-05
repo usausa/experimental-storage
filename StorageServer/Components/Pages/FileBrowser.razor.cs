@@ -9,6 +9,15 @@ using StorageServer.Storage.Models;
 
 public partial class FileBrowser : IAsyncDisposable
 {
+    [Inject]
+    public IStorageService Storage { get; set; } = default!;
+
+    [Inject]
+    public NavigationManager Nav { get; set; } = default!;
+
+    [Inject]
+    public IJSRuntime JS { get; set; } = default!;
+
     [Parameter]
     public string Bucket { get; set; } = string.Empty;
 
@@ -61,7 +70,7 @@ public partial class FileBrowser : IAsyncDisposable
 
     protected override Task OnParametersSetAsync()
     {
-        if (!string.IsNullOrEmpty(Prefix) && !Prefix.EndsWith('/'))
+        if (!String.IsNullOrEmpty(Prefix) && !Prefix.EndsWith('/'))
         {
             Prefix += "/";
         }
@@ -107,7 +116,7 @@ public partial class FileBrowser : IAsyncDisposable
 
     private void NavigateUp()
     {
-        if (string.IsNullOrEmpty(Prefix))
+        if (String.IsNullOrEmpty(Prefix))
         {
             return;
         }
@@ -115,12 +124,12 @@ public partial class FileBrowser : IAsyncDisposable
         var trimmed = Prefix.TrimEnd('/');
         var lastSlash = trimmed.LastIndexOf('/');
         var parent = lastSlash >= 0 ? trimmed[..(lastSlash + 1)] : string.Empty;
-        Nav.NavigateTo(string.IsNullOrEmpty(parent) ? $"/browse/{Bucket}" : $"/browse/{Bucket}/{parent}");
+        Nav.NavigateTo(String.IsNullOrEmpty(parent) ? $"/browse/{Bucket}" : $"/browse/{Bucket}/{parent}");
     }
 
     private List<(string Name, string Path, bool IsLast)> GetBreadcrumbs()
     {
-        if (string.IsNullOrEmpty(Prefix))
+        if (String.IsNullOrEmpty(Prefix))
         {
             return [];
         }
@@ -129,7 +138,7 @@ public partial class FileBrowser : IAsyncDisposable
         var result = new List<(string, string, bool)>();
         for (var i = 0; i < parts.Length; i++)
         {
-            var path = string.Join("/", parts.Take(i + 1)) + "/";
+            var path = String.Join("/", parts.Take(i + 1)) + "/";
             result.Add((parts[i], path, i == parts.Length - 1));
         }
 
@@ -180,7 +189,7 @@ public partial class FileBrowser : IAsyncDisposable
 
     private async Task CreateFolder()
     {
-        if (string.IsNullOrWhiteSpace(newFolderName))
+        if (String.IsNullOrWhiteSpace(newFolderName))
         {
             return;
         }
@@ -242,7 +251,9 @@ public partial class FileBrowser : IAsyncDisposable
     }
 
     [JSInvokable]
+#pragma warning disable CA1024
     public string GetCurrentBucket() => Bucket;
+#pragma warning restore CA1024
 
     [JSInvokable]
     public string GetCurrentPath() => Prefix?.TrimEnd('/') ?? string.Empty;
@@ -368,7 +379,7 @@ public partial class FileBrowser : IAsyncDisposable
         var existingKeys = objects.Select(o =>
         {
             var key = o.Key;
-            if (!string.IsNullOrEmpty(Prefix))
+            if (!String.IsNullOrEmpty(Prefix))
             {
                 key = key[Prefix.Length..];
             }

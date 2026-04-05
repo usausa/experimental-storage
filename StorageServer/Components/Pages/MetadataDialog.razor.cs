@@ -7,6 +7,9 @@ using StorageServer.Storage.Models;
 
 public partial class MetadataDialog
 {
+    [Inject]
+    public IStorageService Storage { get; set; } = default!;
+
     [Parameter]
     [EditorRequired]
     public string Bucket { get; set; } = string.Empty;
@@ -77,10 +80,10 @@ public partial class MetadataDialog
         try
         {
             var newUserMeta = editUserMeta
-                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
+                .Where(kv => !String.IsNullOrWhiteSpace(kv.Key))
                 .ToDictionary(kv => kv.Key.Trim(), kv => kv.Value);
             var newTags = editTags
-                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
+                .Where(kv => !String.IsNullOrWhiteSpace(kv.Key))
                 .ToDictionary(kv => kv.Key.Trim(), kv => kv.Value);
 
             await Storage.UpdateObjectMetadataAsync(Bucket, Key, new ObjectMetadataPatch

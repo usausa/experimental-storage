@@ -74,7 +74,7 @@ public static class MediaTypeHelper
             ".mp3" => "audio/mpeg",
             ".wav" => "audio/wav",
             ".ogg" => "audio/ogg",
-            _ => "application/octet-stream",
+            _ => "application/octet-stream"
         };
     }
 #pragma warning restore CA1308

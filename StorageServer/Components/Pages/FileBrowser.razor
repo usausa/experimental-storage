@@ -1,8 +1,5 @@
 @page "/browse/{Bucket}/{**Prefix}"
 @page "/browse/{Bucket}"
-@inject IStorageService Storage
-@inject NavigationManager Nav
-@inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <PageTitle>@Bucket - StorageServer</PageTitle>
@@ -67,7 +64,7 @@
     </div>
 
     @* Error toast *@
-    @if (error != null)
+    @if (error is not null)
     {
         <div class="fb-error-toast">
             <i class="bi bi-exclamation-circle"></i>

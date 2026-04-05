@@ -8,6 +8,9 @@ using StorageServer.Storage.Models;
 
 public partial class Dashboard
 {
+    [Inject]
+    public IStorageService Storage { get; set; } = default!;
+
     private sealed record BucketRow(BucketInfo Info, BucketStats? Stats);
 
     private List<BucketRow> buckets = [];
@@ -89,7 +92,7 @@ public partial class Dashboard
     private async Task CreateBucket()
     {
         createError = null;
-        if (string.IsNullOrWhiteSpace(newBucketName))
+        if (String.IsNullOrWhiteSpace(newBucketName))
         {
             createError = "Bucket name is required.";
             return;
@@ -181,7 +184,7 @@ public partial class Dashboard
         try
         {
             var tags = editBucketTags
-                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
+                .Where(kv => !String.IsNullOrWhiteSpace(kv.Key))
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
             await Storage.PutBucketTagsAsync(tagsBucketName, tags);
             tagsBucketName = null;
