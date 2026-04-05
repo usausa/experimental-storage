@@ -2,11 +2,12 @@ namespace StorageServer.Middleware;
 
 using System.Globalization;
 using System.Xml.Linq;
-using StorageServer.Consts;
 
+using StorageServer;
+using StorageServer.Consts;
 using StorageServer.Storage;
 
-public sealed class S3Middleware(RequestDelegate next)
+public sealed class S3Middleware(RequestDelegate next, ILogger<S3Middleware> log)
 {
     public async Task InvokeAsync(HttpContext context, IStorageService storageService)
     {
@@ -34,6 +35,18 @@ public sealed class S3Middleware(RequestDelegate next)
         }
         catch (StorageException ex) when (!context.Response.HasStarted)
         {
+            if (ex is not NotModifiedException)
+            {
+                if (ex.HttpStatusCode >= 500)
+                {
+                    log.ErrorS3StorageError(requestId, ex.ErrorCode, ex.HttpStatusCode, ex.Message);
+                }
+                else
+                {
+                    log.WarnS3StorageError(requestId, ex.ErrorCode, ex.HttpStatusCode, ex.Message);
+                }
+            }
+
             var result = ToS3Error(ex, requestId);
             await result.ExecuteAsync(context);
         }

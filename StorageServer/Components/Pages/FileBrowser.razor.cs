@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 using StorageServer.Storage;
-using StorageServer.Storage.Models;
 
 public partial class FileBrowser : IAsyncDisposable
 {

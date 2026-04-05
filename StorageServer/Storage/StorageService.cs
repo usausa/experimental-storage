@@ -11,7 +11,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 
-using StorageServer.Storage.Models;
+using StorageServer;
 
 public sealed class StorageService : IStorageService, IDisposable
 {
@@ -31,7 +31,7 @@ public sealed class StorageService : IStorageService, IDisposable
         WriteIndented = true
     };
 
-    private readonly ILogger<StorageService> logger;
+    private readonly ILogger<StorageService> log;
 
     private readonly StorageOptions storageOptions;
     private readonly string bucketsPath;
@@ -44,10 +44,10 @@ public sealed class StorageService : IStorageService, IDisposable
     //--------------------------------------------------------------------------------
 
     public StorageService(
-        ILogger<StorageService> logger,
+        ILogger<StorageService> log,
         IOptions<StorageOptions> options)
     {
-        this.logger = logger;
+        this.log = log;
         storageOptions = options.Value;
 
         var basePath = Path.GetFullPath(storageOptions.BasePath);
@@ -187,7 +187,7 @@ public sealed class StorageService : IStorageService, IDisposable
             JsonSerializer.Serialize(bucketInfo, JsonOpts),
             token);
 
-        logger.LogInformation("Created bucket {Bucket}", bucket);
+        log.InfoBucketCreated(bucket);
     }
 
     public ValueTask<bool> BucketExistsAsync(string bucket, CancellationToken token = default)
@@ -215,7 +215,8 @@ public sealed class StorageService : IStorageService, IDisposable
 
         Directory.Delete(bucketDir, recursive: true);
 
-        logger.LogInformation("Deleted bucket {Bucket} (force={Force})", bucket, force);
+        log.InfoBucketDeleted(bucket, force);
+
         return ValueTask.CompletedTask;
     }
 
@@ -501,7 +502,7 @@ public sealed class StorageService : IStorageService, IDisposable
         };
         await SaveStoredMetaAsync(bucket, key, storedMeta, token);
 
-        logger.LogDebug("Put object {Bucket}/{Key} versionId={VersionId}", bucket, key, versionId);
+        log.DebugObjectPut(bucket, key, versionId);
 
         return new PutObjectResult
         {
@@ -547,7 +548,7 @@ public sealed class StorageService : IStorageService, IDisposable
 
         await DeleteStoredMetaAsync(bucket, key);
 
-        logger.LogDebug("Deleted object {Bucket}/{Key}", bucket, key);
+        log.DebugObjectDeleted(bucket, key);
     }
 
     public async ValueTask<IReadOnlyList<DeleteObjectResult>> DeleteObjectsAsync(string bucket, IEnumerable<string> keys, CancellationToken token = default)
@@ -572,6 +573,8 @@ public sealed class StorageService : IStorageService, IDisposable
             }
             catch (Exception ex)
             {
+                log.WarnObjectDeleteFailed(bucket, key, ex.Message);
+
                 results.Add(new DeleteObjectResult
                 {
                     Key = key,
@@ -652,6 +655,8 @@ public sealed class StorageService : IStorageService, IDisposable
         var etag = ComputeETag(info);
         destMeta.ETag = $"\"{etag}\"";
         await SaveStoredMetaAsync(bucket, key, destMeta, token);
+
+        log.InfoObjectCopied(sourceBucket, sourceKey, bucket, key, versionId);
 
         return new CopyObjectResult
         {
@@ -893,6 +898,8 @@ public sealed class StorageService : IStorageService, IDisposable
         var path = ResolveBucketMetaFile(bucket, "_acl.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(acl, JsonOpts), token);
+
+        log.InfoBucketAclUpdated(bucket, acl);
     }
 
     //--------------------------------------------------------------------------------
@@ -928,6 +935,8 @@ public sealed class StorageService : IStorageService, IDisposable
         var path = ResolveBucketMetaFile(bucket, "_cors.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(rules, JsonOpts), token);
+
+        log.InfoBucketCorsUpdated(bucket);
     }
 
     public ValueTask DeleteBucketCorsAsync(string bucket, CancellationToken token = default)
@@ -940,6 +949,8 @@ public sealed class StorageService : IStorageService, IDisposable
         {
             File.Delete(path);
         }
+
+        log.InfoBucketCorsDeleted(bucket);
 
         return ValueTask.CompletedTask;
     }
@@ -984,7 +995,8 @@ public sealed class StorageService : IStorageService, IDisposable
             JsonSerializer.Serialize(meta, JsonOpts),
             token);
 
-        logger.LogDebug("Created multipart upload {UploadId} for {Bucket}/{Key}", uploadId, bucket, key);
+        log.DebugMultipartUploadCreated(uploadId, bucket, key);
+
         return uploadId;
     }
 
@@ -1090,7 +1102,7 @@ public sealed class StorageService : IStorageService, IDisposable
 
         Directory.Delete(uploadDir, recursive: true);
 
-        logger.LogDebug("Completed multipart upload {UploadId} for {Bucket}/{Key}", uploadId, bucket, key);
+        log.DebugMultipartUploadCompleted(uploadId, bucket, key);
 
         return new CompleteMultipartResult
         {
@@ -1109,7 +1121,8 @@ public sealed class StorageService : IStorageService, IDisposable
             Directory.Delete(uploadDir, recursive: true);
         }
 
-        logger.LogDebug("Aborted multipart upload {UploadId}", uploadId);
+        log.DebugMultipartUploadAborted(uploadId);
+
         return ValueTask.CompletedTask;
     }
 
@@ -1428,7 +1441,7 @@ public sealed class StorageService : IStorageService, IDisposable
             File.Delete(versionMetaPath);
         }
 
-        logger.LogInformation("Restored version {VersionId} of {Bucket}/{Key}", versionId, bucket, key);
+        log.InfoVersionRestored(versionId, bucket, key);
     }
 
     public async ValueTask DeleteVersionAsync(string bucket, string key, string versionId, CancellationToken token = default)
@@ -1461,6 +1474,8 @@ public sealed class StorageService : IStorageService, IDisposable
         {
             Directory.Delete(versionDir);
         }
+
+        log.InfoVersionDeleted(versionId, bucket, key);
     }
 
     public async ValueTask PurgeObjectAsync(string bucket, string key, CancellationToken token = default)
@@ -1485,7 +1500,7 @@ public sealed class StorageService : IStorageService, IDisposable
             CleanEmptyDirectories(versionDir, ResolveBucketVersionsDir(bucket));
         }
 
-        logger.LogDebug("Purged object {Bucket}/{Key} including all versions", bucket, key);
+        log.InfoObjectPurged(bucket, key);
     }
 
     //--------------------------------------------------------------------------------

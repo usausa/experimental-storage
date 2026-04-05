@@ -1,7 +1,5 @@
 namespace StorageServer.Storage;
 
-using StorageServer.Storage.Models;
-
 public interface IStorageService
 {
     //--------------------------------------------------------------------------------

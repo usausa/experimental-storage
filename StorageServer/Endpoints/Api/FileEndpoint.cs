@@ -1,7 +1,6 @@
 namespace StorageServer.Endpoints.Api;
 
 using StorageServer.Storage;
-using StorageServer.Storage.Models;
 
 public static class FileEndpoint
 {

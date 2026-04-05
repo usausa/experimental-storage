@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 using StorageServer.Consts;
 using StorageServer.Helpers;
 using StorageServer.Storage;
-using StorageServer.Storage.Models;
 
 // ReSharper disable ClassNeverInstantiated.Local
 #pragma warning disable CA1812

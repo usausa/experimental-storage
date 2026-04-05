@@ -3,7 +3,6 @@ namespace StorageServer.Components.Pages;
 using Microsoft.AspNetCore.Components;
 
 using StorageServer.Storage;
-using StorageServer.Storage.Models;
 
 public partial class MetadataDialog
 {
