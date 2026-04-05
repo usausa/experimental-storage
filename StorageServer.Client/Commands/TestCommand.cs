@@ -24,13 +24,17 @@ public sealed class TestCommand : ICommandHandler
 
     public async ValueTask ExecuteAsync(CommandContext context)
     {
-        // ── 1. Create bucket ────────────────────────────────────────────
+        //--------------------------------------------------------------------------------
+        // 1. Create bucket
+        //--------------------------------------------------------------------------------
         Console.WriteLine("=== Create Bucket ===");
         await client.PutBucketAsync(BucketName);
         Console.WriteLine($"  Created: {BucketName}");
 
-        // ── 2. Upload objects with hierarchical keys and metadata ────────
-        Console.WriteLine("\n=== Upload Objects ===");
+        //--------------------------------------------------------------------------------
+        // 2. Upload objects with hierarchical keys and metadata
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Upload Objects ===");
         string[] keys =
         [
             "readme.txt",
@@ -52,8 +56,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"  Uploaded: {key}");
         }
 
-        // ── 3. List all objects (flat) ──────────────────────────────────
-        Console.WriteLine("\n=== List All Objects (flat) ===");
+        //--------------------------------------------------------------------------------
+        // 3. List all objects (flat)
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== List All Objects (flat) ===");
         var flatList = await client.ListObjectsV2Async(
             new ListObjectsV2Request { BucketName = BucketName });
         foreach (var obj in flatList.S3Objects)
@@ -61,8 +67,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"  {obj.Key} ({obj.Size} bytes)");
         }
 
-        // ── 4. List with delimiter (hierarchy browsing) ─────────────────
-        Console.WriteLine("\n=== Root Level (delimiter='/') ===");
+        //--------------------------------------------------------------------------------
+        // 4. List with delimiter (hierarchy browsing)
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Root Level (delimiter='/') ===");
         var rootList = await client.ListObjectsV2Async(
             new ListObjectsV2Request { BucketName = BucketName, Delimiter = "/" });
         foreach (var cp in rootList.CommonPrefixes)
@@ -74,8 +82,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"  [FILE] {obj.Key}");
         }
 
-        // ── 5. Pagination (MaxKeys=2) ───────────────────────────────────
-        Console.WriteLine("\n=== Pagination (MaxKeys=2) ===");
+        //--------------------------------------------------------------------------------
+        // 5. Pagination (MaxKeys=2)
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Pagination (MaxKeys=2) ===");
         string? continuationToken = null;
         var page = 1;
         do
@@ -94,8 +104,10 @@ public sealed class TestCommand : ICommandHandler
         }
         while (continuationToken is not null);
 
-        // ── 6. CopyObject ───────────────────────────────────────────────
-        Console.WriteLine("\n=== Copy Object ===");
+        //--------------------------------------------------------------------------------
+        // 6. CopyObject
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Copy Object ===");
         await client.CopyObjectAsync(new CopyObjectRequest
         {
             SourceBucket = BucketName,
@@ -110,8 +122,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"  Content: {await reader.ReadToEndAsync()}");
         }
 
-        // ── 7. Content-Type and user-defined metadata ───────────────────
-        Console.WriteLine("\n=== Content-Type & User Metadata ===");
+        //--------------------------------------------------------------------------------
+        // 7. Content-Type and user-defined metadata
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Content-Type & User Metadata ===");
         await client.PutObjectAsync(new PutObjectRequest
         {
             BucketName = BucketName,
@@ -158,8 +172,10 @@ public sealed class TestCommand : ICommandHandler
         Console.WriteLine($"  REPLACE directive -> ContentType: {replacedMeta.Headers.ContentType}" +
             $", project={replacedMeta.Metadata["project"]}");
 
-        // ── 8. Range request (partial download) ─────────────────────────
-        Console.WriteLine("\n=== Range Request ===");
+        //--------------------------------------------------------------------------------
+        // 8. Range request (partial download)
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Range Request ===");
         var rangeResp = await client.GetObjectAsync(new GetObjectRequest
         {
             BucketName = BucketName,
@@ -171,8 +187,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"  Bytes 0-6: \"{await reader.ReadToEndAsync()}\"");
         }
 
-        // ── 9. Conditional request (If-None-Match → 304) ────────────────
-        Console.WriteLine("\n=== Conditional Request ===");
+        //--------------------------------------------------------------------------------
+        // 9. Conditional request (If-None-Match → 304)
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Conditional Request ===");
         var headResp = await client.GetObjectMetadataAsync(BucketName, "readme.txt");
         Console.WriteLine($"  Current ETag: {headResp.ETag}");
         try
@@ -190,8 +208,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine("  304 Not Modified (as expected)");
         }
 
-        // ── 10. Multipart upload ────────────────────────────────────────
-        Console.WriteLine("\n=== Multipart Upload ===");
+        //--------------------------------------------------------------------------------
+        // 10. Multipart upload
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Multipart Upload ===");
         var initResp = await client.InitiateMultipartUploadAsync(
             new InitiateMultipartUploadRequest
             {
@@ -233,8 +253,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"  Content: {await reader.ReadToEndAsync()}");
         }
 
-        // ── 11. Object tagging ──────────────────────────────────────────
-        Console.WriteLine("\n=== Object Tagging ===");
+        //--------------------------------------------------------------------------------
+        // 11. Object tagging
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Object Tagging ===");
         await client.PutObjectTaggingAsync(new PutObjectTaggingRequest
         {
             BucketName = BucketName,
@@ -261,8 +283,10 @@ public sealed class TestCommand : ICommandHandler
             new DeleteObjectTaggingRequest { BucketName = BucketName, Key = "readme.txt" });
         Console.WriteLine("  Tags deleted from readme.txt");
 
-        // ── 12. Bucket tagging ──────────────────────────────────────────
-        Console.WriteLine("\n=== Bucket Tagging ===");
+        //--------------------------------------------------------------------------------
+        // 12. Bucket tagging
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Bucket Tagging ===");
         await client.PutBucketTaggingAsync(new PutBucketTaggingRequest
         {
             BucketName = BucketName,
@@ -284,8 +308,10 @@ public sealed class TestCommand : ICommandHandler
         await client.DeleteBucketTaggingAsync(BucketName);
         Console.WriteLine("  Tags deleted from bucket");
 
-        // ── 13. ListMultipartUploads / ListParts ────────────────────────
-        Console.WriteLine("\n=== ListMultipartUploads / ListParts ===");
+        //--------------------------------------------------------------------------------
+        // 13. ListMultipartUploads / ListParts
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== ListMultipartUploads / ListParts ===");
         var mpInit = await client.InitiateMultipartUploadAsync(
             new InitiateMultipartUploadRequest
             {
@@ -332,8 +358,10 @@ public sealed class TestCommand : ICommandHandler
         });
         Console.WriteLine("  Multipart upload aborted");
 
-        // ── 14. Storage Class ───────────────────────────────────────────
-        Console.WriteLine("\n=== Storage Class ===");
+        //--------------------------------------------------------------------------------
+        // 14. Storage Class
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Storage Class ===");
         await client.PutObjectAsync(new PutObjectRequest
         {
             BucketName = BucketName,
@@ -355,8 +383,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"  {o.Key} -> StorageClass: {o.StorageClass}");
         }
 
-        // ── 15. ACL ─────────────────────────────────────────────────────
-        Console.WriteLine("\n=== ACL ===");
+        //--------------------------------------------------------------------------------
+        // 15. ACL
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== ACL ===");
 #pragma warning disable CS0618
         var bucketAcl = await client.GetACLAsync(new GetACLRequest { BucketName = BucketName });
 #pragma warning restore CS0618
@@ -387,8 +417,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine($"    {grant.Grantee.Type}: {grant.Permission}");
         }
 
-        // ── 16. Bucket CORS ─────────────────────────────────────────────
-        Console.WriteLine("\n=== Bucket CORS ===");
+        //--------------------------------------------------------------------------------
+        // 16. Bucket CORS
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Bucket CORS ===");
         await client.PutCORSConfigurationAsync(new PutCORSConfigurationRequest
         {
             BucketName = BucketName,
@@ -421,8 +453,10 @@ public sealed class TestCommand : ICommandHandler
             new DeleteCORSConfigurationRequest { BucketName = BucketName });
         Console.WriteLine("  CORS configuration deleted");
 
-        // ── 17. Soft Delete ─────────────────────────────────────────────
-        Console.WriteLine("\n=== Soft Delete ===");
+        //--------------------------------------------------------------------------------
+        // 17. Soft Delete
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Soft Delete ===");
         const string deleteKey = "delete-test.txt";
         await client.PutObjectAsync(new PutObjectRequest
         {
@@ -445,8 +479,10 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine("  404 Not Found (as expected)");
         }
 
-        // ── 18. DeleteObjects (bulk delete) ─────────────────────────────
-        Console.WriteLine("\n=== Bulk Delete ===");
+        //--------------------------------------------------------------------------------
+        // 18. DeleteObjects (bulk delete)
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Bulk Delete ===");
         var allObjects = await client.ListObjectsV2Async(
             new ListObjectsV2Request { BucketName = BucketName });
         var delResp = await client.DeleteObjectsAsync(new DeleteObjectsRequest
@@ -456,12 +492,16 @@ public sealed class TestCommand : ICommandHandler
         });
         Console.WriteLine($"  Deleted {delResp.DeletedObjects.Count} objects");
 
-        // ── 19. Cleanup ─────────────────────────────────────────────────
+        //--------------------------------------------------------------------------------
+        // 19. Cleanup
+        //--------------------------------------------------------------------------------
         await client.DeleteBucketAsync(BucketName);
         Console.WriteLine($"  Bucket deleted: {BucketName}");
 
-        // ── 20. Virtual-hosted style access ─────────────────────────────
-        Console.WriteLine("\n=== Virtual-Hosted Style ===");
+        //--------------------------------------------------------------------------------
+        // 20. Virtual-hosted style access
+        //--------------------------------------------------------------------------------
+        Console.WriteLine("=== Virtual-Hosted Style ===");
         try
         {
             var vhConfig = new AmazonS3Config
@@ -508,6 +548,6 @@ public sealed class TestCommand : ICommandHandler
             Console.WriteLine("    127.0.0.1 s3.localhost vh-demo.s3.localhost");
         }
 
-        Console.WriteLine("\n=== All operations completed successfully ===");
+        Console.WriteLine("=== All operations completed successfully ===");
     }
 }
