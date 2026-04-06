@@ -54,6 +54,7 @@ public partial class FileBrowser : IAsyncDisposable
         Soft,
         Hard
     }
+
     private bool showDeleteConfirm;
     private string deleteDisplayName = string.Empty;
     private bool deleteIsFolder;
