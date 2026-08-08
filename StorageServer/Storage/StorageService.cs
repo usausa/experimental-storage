@@ -1658,10 +1658,22 @@ public sealed class StorageService : IStorageService, IDisposable
     // Path helper
     //--------------------------------------------------------------------------------
 
+    private static bool IsUnder(string path, string root)
+    {
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return (path.Length == root.Length) ||
+               (path[root.Length] == Path.DirectorySeparatorChar) ||
+               (path[root.Length] == Path.AltDirectorySeparatorChar);
+    }
+
     private string ResolveBucketRootPath(string bucket)
     {
         var path = Path.GetFullPath(Path.Combine(bucketsPath, bucket));
-        if (!path.StartsWith(bucketsPath, StringComparison.OrdinalIgnoreCase))
+        if (!IsUnder(path, bucketsPath))
         {
             throw new InvalidBucketNameException(bucket, "Path traversal detected.");
         }
@@ -1714,7 +1726,7 @@ public sealed class StorageService : IStorageService, IDisposable
         var bucketDataPath = ResolveBucketDataPath(bucket);
         var normalizedKey = NormalizeKeyForPath(key);
         var path = Path.GetFullPath(Path.Combine(bucketDataPath, normalizedKey));
-        if (!path.StartsWith(bucketDataPath, StringComparison.OrdinalIgnoreCase))
+        if (!IsUnder(path, bucketDataPath))
         {
             throw new InvalidObjectKeyException(key, "Path traversal detected.");
         }
@@ -1727,7 +1739,7 @@ public sealed class StorageService : IStorageService, IDisposable
         var bucketMetaDir = ResolveBucketMetaDir(bucket);
         var path = Path.GetFullPath(
             Path.Combine(bucketMetaDir, "objects", normalizedKey + ".meta.json"));
-        if (!path.StartsWith(bucketMetaDir, StringComparison.OrdinalIgnoreCase))
+        if (!IsUnder(path, bucketMetaDir))
         {
             throw new InvalidObjectKeyException(key, "Path traversal detected.");
         }
@@ -1856,7 +1868,7 @@ public sealed class StorageService : IStorageService, IDisposable
         var dir = Path.GetDirectoryName(filePath);
         while (dir is not null
             && dir.Length > stopAtPath.Length
-            && dir.StartsWith(stopAtPath, StringComparison.OrdinalIgnoreCase)
+            && IsUnder(dir, stopAtPath)
             && !Directory.EnumerateFileSystemEntries(dir).Any())
         {
             Directory.Delete(dir);
