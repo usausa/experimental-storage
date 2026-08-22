@@ -148,8 +148,8 @@ public partial class FileBrowser : IAsyncDisposable
                 Prefix = Prefix,
                 Delimiter = "/"
             });
-            directories = result.CommonPrefixes.ToList();
-            objects = result.Objects.Where(x => x.Key != Prefix).ToList();
+            directories = [.. result.CommonPrefixes];
+            objects = [.. result.Objects.Where(x => x.Key != Prefix)];
 
             // Include soft-deleted objects at the current prefix level
             var currentPrefix = Prefix ?? string.Empty;
@@ -159,7 +159,7 @@ public partial class FileBrowser : IAsyncDisposable
                 var afterPrefix = x.Key[currentPrefix.Length..];
                 return !afterPrefix.Contains('/', StringComparison.Ordinal);
             });
-            objects = objects.Concat(directDeleted).ToList();
+            objects = [.. objects, .. directDeleted];
         }
         catch (StorageException ex)
         {
@@ -465,7 +465,7 @@ public partial class FileBrowser : IAsyncDisposable
         try
         {
             var result = await Storage.ListVersionsAsync(Bucket, key);
-            versions = result.ToList();
+            versions = [.. result];
         }
         catch (StorageException ex)
         {
