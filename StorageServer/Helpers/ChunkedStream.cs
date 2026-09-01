@@ -63,7 +63,7 @@ public sealed class ChunkedStream : Stream
 
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        if (finished || buffer.Length == 0)
+        if (finished || (buffer.Length == 0))
         {
             return 0;
         }

@@ -75,13 +75,13 @@ public sealed class S3Middleware(RequestDelegate next, ILogger<S3Middleware> log
 
             foreach (var rule in corsRules)
             {
-                var originMatch = rule.AllowedOrigins.Any(x => x == "*" || String.Equals(x, origin, StringComparison.OrdinalIgnoreCase));
+                var originMatch = rule.AllowedOrigins.Any(x => (x == "*") || String.Equals(x, origin, StringComparison.OrdinalIgnoreCase));
                 if (!originMatch)
                 {
                     continue;
                 }
 
-                var methodMatch = rule.AllowedMethods.Any(x => x == "*" || String.Equals(x, method, StringComparison.OrdinalIgnoreCase));
+                var methodMatch = rule.AllowedMethods.Any(x => (x == "*") || String.Equals(x, method, StringComparison.OrdinalIgnoreCase));
                 if (!methodMatch && !HttpMethods.IsOptions(context.Request.Method))
                 {
                     continue;

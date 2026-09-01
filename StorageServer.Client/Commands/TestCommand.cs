@@ -97,7 +97,7 @@ public sealed class TestCommand : ICommandHandler
                 ContinuationToken = continuationToken
             });
             Console.WriteLine($"  Page {page}: " +
-                $"{string.Join(", ", resp.S3Objects.Select(o => o.Key))} " +
+                $"{String.Join(", ", resp.S3Objects.Select(o => o.Key))} " +
                 $"(IsTruncated={resp.IsTruncated})");
             continuationToken = resp.IsTruncated == true ? resp.NextContinuationToken : null;
             page++;
@@ -445,8 +445,8 @@ public sealed class TestCommand : ICommandHandler
             new GetCORSConfigurationRequest { BucketName = BucketName });
         foreach (var rule in corsResp.Configuration.Rules)
         {
-            Console.WriteLine($"  Origins: {string.Join(", ", rule.AllowedOrigins)}");
-            Console.WriteLine($"  Methods: {string.Join(", ", rule.AllowedMethods)}");
+            Console.WriteLine($"  Origins: {String.Join(", ", rule.AllowedOrigins)}");
+            Console.WriteLine($"  Methods: {String.Join(", ", rule.AllowedMethods)}");
         }
 
         await client.DeleteCORSConfigurationAsync(

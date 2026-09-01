@@ -263,7 +263,7 @@ public sealed class StorageService : IStorageService, IDisposable
             objectCount++;
             totalSize += fi.Length;
             var mod = new DateTimeOffset(fi.LastWriteTimeUtc, TimeSpan.Zero);
-            if (lastModified is null || mod > lastModified)
+            if ((lastModified is null) || (mod > lastModified))
             {
                 lastModified = mod;
             }
@@ -355,7 +355,7 @@ public sealed class StorageService : IStorageService, IDisposable
         }
 
         string? nextToken = null;
-        if (truncated && lastKey is not null)
+        if (truncated && (lastKey is not null))
         {
             nextToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(lastKey));
         }
@@ -431,7 +431,7 @@ public sealed class StorageService : IStorageService, IDisposable
         Stream content;
         long contentLength;
 
-        if (options?.RangeStart is not null || options?.RangeEnd is not null)
+        if ((options?.RangeStart is not null) || (options?.RangeEnd is not null))
         {
             var start = options.RangeStart ?? 0;
             var end = options.RangeEnd ?? (info.Length - 1);
@@ -624,7 +624,7 @@ public sealed class StorageService : IStorageService, IDisposable
         var directive = options?.MetadataDirective ?? "COPY";
 
         StoredObjectMeta destMeta;
-        if (String.Equals(directive, "REPLACE", StringComparison.OrdinalIgnoreCase) && options?.NewMetadata is not null)
+        if (String.Equals(directive, "REPLACE", StringComparison.OrdinalIgnoreCase) && (options?.NewMetadata is not null))
         {
             var nm = options.NewMetadata;
             destMeta = new StoredObjectMeta
@@ -789,7 +789,7 @@ public sealed class StorageService : IStorageService, IDisposable
         }
 
         var meta = await LoadStoredMetaAsync(bucket, key, token);
-        if (meta is not null && meta.Tags.Count > 0)
+        if ((meta is not null) && (meta.Tags.Count > 0))
         {
             meta.Tags = [];
             await SaveStoredMetaAsync(bucket, key, meta, token);
@@ -1145,7 +1145,7 @@ public sealed class StorageService : IStorageService, IDisposable
 
                 var json = await File.ReadAllTextAsync(infoPath, token);
                 var info = JsonSerializer.Deserialize<MultipartMeta>(json, JsonOpts);
-                if (info is null || info.Bucket != bucket)
+                if ((info is null) || (info.Bucket != bucket))
                 {
                     continue;
                 }
@@ -1270,7 +1270,7 @@ public sealed class StorageService : IStorageService, IDisposable
             var key = relPath.Replace(Path.DirectorySeparatorChar, '/');
 
             // Skip folder marker files
-            if (key.EndsWith("/" + FolderMarkerFile, StringComparison.Ordinal) || key == FolderMarkerFile)
+            if (key.EndsWith("/" + FolderMarkerFile, StringComparison.Ordinal) || (key == FolderMarkerFile))
             {
                 continue;
             }
@@ -1290,7 +1290,7 @@ public sealed class StorageService : IStorageService, IDisposable
 
             var index = await LoadVersionIndexAsync(bucket, key, token);
             var mostRecent = index.Versions.OrderByDescending(v => v.LastModified).FirstOrDefault();
-            if (mostRecent is null || !mostRecent.IsDeleteMarker)
+            if ((mostRecent is null) || !mostRecent.IsDeleteMarker)
             {
                 continue;
             }
@@ -1866,8 +1866,8 @@ public sealed class StorageService : IStorageService, IDisposable
     private static void CleanEmptyDirectories(string filePath, string stopAtPath)
     {
         var dir = Path.GetDirectoryName(filePath);
-        while (dir is not null
-            && dir.Length > stopAtPath.Length
+        while ((dir is not null)
+            && (dir.Length > stopAtPath.Length)
             && IsUnder(dir, stopAtPath)
             && !Directory.EnumerateFileSystemEntries(dir).Any())
         {
@@ -1880,23 +1880,23 @@ public sealed class StorageService : IStorageService, IDisposable
     {
         var quotedEtag = $"\"{etag}\"";
 
-        if (!String.IsNullOrEmpty(options.IfMatch) && options.IfMatch != "*" && options.IfMatch != quotedEtag)
+        if (!String.IsNullOrEmpty(options.IfMatch) && (options.IfMatch != "*") && (options.IfMatch != quotedEtag))
         {
             throw new PreconditionFailedException($"ETag '{quotedEtag}' does not match If-Match '{options.IfMatch}'.");
         }
 
-        if (options.IfUnmodifiedSince.HasValue && lastModified > options.IfUnmodifiedSince.Value)
+        if (options.IfUnmodifiedSince.HasValue && (lastModified > options.IfUnmodifiedSince.Value))
         {
             throw new PreconditionFailedException("Object was modified after If-Unmodified-Since.");
         }
 
         if (!String.IsNullOrEmpty(options.IfNoneMatch)
-            && (options.IfNoneMatch == "*" || options.IfNoneMatch == quotedEtag))
+            && ((options.IfNoneMatch == "*") || (options.IfNoneMatch == quotedEtag)))
         {
             throw new NotModifiedException();
         }
 
-        if (options.IfModifiedSince.HasValue && lastModified <= options.IfModifiedSince.Value)
+        if (options.IfModifiedSince.HasValue && (lastModified <= options.IfModifiedSince.Value))
         {
             throw new NotModifiedException();
         }

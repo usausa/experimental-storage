@@ -59,7 +59,7 @@ public partial class FilePreview
     protected override async Task OnParametersSetAsync()
     {
         textContent = null;
-        if (IsTextFile && Size <= 1024 * 1024)
+        if (IsTextFile && (Size <= 1024 * 1024))
         {
             try
             {

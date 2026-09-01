@@ -145,6 +145,7 @@ public sealed record ObjectMetadataPatch
 // CORS
 //--------------------------------------------------------------------------------
 
+#pragma warning disable CA1002
 public sealed record CorsRule
 {
     public List<string> AllowedOrigins { get; init; } = [];
@@ -153,6 +154,7 @@ public sealed record CorsRule
     public List<string> ExposeHeaders { get; init; } = [];
     public int MaxAgeSeconds { get; init; }
 }
+#pragma warning restore CA1002
 
 //--------------------------------------------------------------------------------
 // Multipart

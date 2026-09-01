@@ -109,9 +109,9 @@ public static class S3Endpoints
                 new XElement(S3Names.VersioningConfiguration,
                     new XElement(S3Names.Status, "Enabled"))));
         }
-        if (query.Lifecycle is not null || query.Policy is not null ||
-            query.Logging is not null || query.Notification is not null ||
-            query.Encryption is not null)
+        if ((query.Lifecycle is not null) || (query.Policy is not null) ||
+            (query.Logging is not null) || (query.Notification is not null) ||
+            (query.Encryption is not null))
         {
             return Results.NoContent();
         }
@@ -181,8 +181,8 @@ public static class S3Endpoints
             await storage.PutBucketCorsAsync(bucket, rules);
             return Results.Ok();
         }
-        if (query.Versioning is not null || query.Lifecycle is not null || query.Policy is not null ||
-            query.Logging is not null || query.Notification is not null || query.Encryption is not null)
+        if ((query.Versioning is not null) || (query.Lifecycle is not null) || (query.Policy is not null) ||
+            (query.Logging is not null) || (query.Notification is not null) || (query.Encryption is not null))
         {
             return Results.Ok();
         }
@@ -306,13 +306,13 @@ public static class S3Endpoints
 
         var options = new GetObjectOptions();
 
-        if (headers.Range is not null &&
+        if ((headers.Range is not null) &&
             headers.Range.StartsWith("bytes=", StringComparison.Ordinal))
         {
             var range = headers.Range["bytes=".Length..];
             var rangeParts = range.Split('-');
             var start = Int64.TryParse(rangeParts[0], out var s) ? s : (long?)null;
-            var end = rangeParts.Length > 1 && Int64.TryParse(rangeParts[1], out var e) ? e : (long?)null;
+            var end = (rangeParts.Length > 1) && Int64.TryParse(rangeParts[1], out var e) ? e : (long?)null;
             options = options with { RangeStart = start, RangeEnd = end };
         }
 
@@ -326,13 +326,13 @@ public static class S3Endpoints
             options = options with { IfMatch = headers.IfMatch };
         }
 
-        if (headers.IfModifiedSince is not null &&
+        if ((headers.IfModifiedSince is not null) &&
             DateTimeOffset.TryParse(headers.IfModifiedSince, out var ims))
         {
             options = options with { IfModifiedSince = ims };
         }
 
-        if (headers.IfUnmodifiedSince is not null &&
+        if ((headers.IfUnmodifiedSince is not null) &&
             DateTimeOffset.TryParse(headers.IfUnmodifiedSince, out var ius))
         {
             options = options with { IfUnmodifiedSince = ius };
@@ -392,7 +392,7 @@ public static class S3Endpoints
         }
 
         // UploadPart
-        if (query.PartNumber is not null && query.UploadId is not null)
+        if ((query.PartNumber is not null) && (query.UploadId is not null))
         {
             var partBody = GetBodyStream(context);
             var partResult = await storage.UploadPartAsync(query.UploadId, query.PartNumber.Value, partBody);

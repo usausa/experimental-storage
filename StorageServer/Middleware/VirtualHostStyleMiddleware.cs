@@ -47,7 +47,7 @@ public class VirtualHostStyleMiddleware(RequestDelegate next, IConfiguration con
         {
             context.Request.Path = "/storage" + context.Request.Path;
         }
-        else if (!IsAppPath(path) && path.Length > 1)
+        else if (!IsAppPath(path) && (path.Length > 1))
         {
             context.Request.Path = "/storage" + context.Request.Path;
         }

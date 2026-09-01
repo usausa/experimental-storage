@@ -96,7 +96,7 @@ public sealed class GetObjectCommand : ICommandHandler
         var outputPath = OutputPath ?? Path.GetFileName(Key);
 
         var outputDir = Path.GetDirectoryName(outputPath);
-        if (!string.IsNullOrEmpty(outputDir))
+        if (!String.IsNullOrEmpty(outputDir))
         {
             Directory.CreateDirectory(outputDir);
         }
