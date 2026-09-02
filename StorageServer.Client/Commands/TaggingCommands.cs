@@ -6,9 +6,7 @@ using Amazon.S3.Model;
 using Smart.CommandLine.Hosting;
 
 [Command("tag", "Tagging operations")]
-public sealed class TagCommand
-{
-}
+public sealed class TagCommand;
 
 [Command("get-object", "Get object tags")]
 public sealed class GetObjectTagsCommand : ICommandHandler

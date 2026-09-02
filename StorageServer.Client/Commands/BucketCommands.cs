@@ -5,9 +5,7 @@ using Amazon.S3;
 using Smart.CommandLine.Hosting;
 
 [Command("bucket", "Bucket operations")]
-public sealed class BucketCommand
-{
-}
+public sealed class BucketCommand;
 
 [Command("create", "Create a bucket")]
 public sealed class CreateBucketCommand : ICommandHandler

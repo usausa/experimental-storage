@@ -6,9 +6,7 @@ using Amazon.S3.Model;
 using Smart.CommandLine.Hosting;
 
 [Command("object", "Object operations")]
-public sealed class ObjectCommand
-{
-}
+public sealed class ObjectCommand;
 
 [Command("put", "Upload a file as an object")]
 public sealed class PutObjectCommand : ICommandHandler
