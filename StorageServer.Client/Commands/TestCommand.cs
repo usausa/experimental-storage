@@ -485,11 +485,13 @@ public sealed class TestCommand : ICommandHandler
         Console.WriteLine("=== Bulk Delete ===");
         var allObjects = await client.ListObjectsV2Async(
             new ListObjectsV2Request { BucketName = BucketName });
+#pragma warning disable IDE0028
         var delResp = await client.DeleteObjectsAsync(new DeleteObjectsRequest
         {
             BucketName = BucketName,
             Objects = allObjects.S3Objects.Select(o => new KeyVersion { Key = o.Key }).ToList()
         });
+#pragma warning restore IDE0028
         Console.WriteLine($"  Deleted {delResp.DeletedObjects.Count} objects");
 
         //--------------------------------------------------------------------------------
