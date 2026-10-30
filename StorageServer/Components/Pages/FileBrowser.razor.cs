@@ -148,10 +148,8 @@ public partial class FileBrowser : IAsyncDisposable
                 Prefix = Prefix,
                 Delimiter = "/"
             });
-#pragma warning disable IDE0028
             directories = result.CommonPrefixes.ToList();
             objects = result.Objects.Where(x => x.Key != Prefix).ToList();
-#pragma warning restore IDE0028
 
             // Include soft-deleted objects at the current prefix level
             var currentPrefix = Prefix ?? string.Empty;

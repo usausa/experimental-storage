@@ -158,9 +158,7 @@ public partial class Dashboard
         try
         {
             var tags = await Storage.GetBucketTagsAsync(name);
-#pragma warning disable IDE0028
             editBucketTags = tags.Select(static x => new KeyValuePair<string, string>(x.Key, x.Value)).ToList();
-#pragma warning restore IDE0028
         }
         catch (StorageException ex)
         {

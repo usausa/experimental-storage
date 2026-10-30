@@ -701,7 +701,6 @@ public static class S3Endpoints
         return tags;
     }
 
-#pragma warning disable IDE0028
     private static List<CorsRule> ParseCorsConfiguration(XDocument doc) =>
         doc.Descendants()
             .Where(static x => x.Name.LocalName == "CORSRule")
@@ -714,9 +713,7 @@ public static class S3Endpoints
                 MaxAgeSeconds = Int32.TryParse(x.Elements().FirstOrDefault(static y => y.Name.LocalName == "MaxAgeSeconds")?.Value, out var s) ? s : 0
             })
             .ToList();
-#pragma warning restore IDE0028
 
-#pragma warning disable IDE0028
     private static List<string> ParseDeleteObjects(XDocument doc) =>
         doc.Descendants()
             .Where(static x => x.Name.LocalName == "Object")
@@ -724,9 +721,7 @@ public static class S3Endpoints
             .Where(static x => x is not null)
             .Cast<string>()
             .ToList();
-#pragma warning restore IDE0028
 
-#pragma warning disable IDE0028
     private static List<PartInfo> ParseCompleteMultipartUpload(XDocument doc) =>
         doc.Descendants()
             .Where(static x => x.Name.LocalName == "Part")
@@ -736,7 +731,6 @@ public static class S3Endpoints
                 ETag = x.Elements().FirstOrDefault(static y => y.Name.LocalName == "ETag")?.Value ?? string.Empty
             })
             .ToList();
-#pragma warning restore IDE0028
 
     //--------------------------------------------------------------------------------
     // Request Helper

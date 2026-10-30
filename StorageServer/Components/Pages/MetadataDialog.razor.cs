@@ -50,10 +50,8 @@ public partial class MetadataDialog
         try
         {
             metadata = await Storage.GetObjectMetadataAsync(Bucket, Key);
-#pragma warning disable IDE0028
             editUserMeta = metadata.UserMetadata.Select(static x => new KvPair(x.Key, x.Value)).ToList();
             editTags = metadata.Tags.Select(static x => new KvPair(x.Key, x.Value)).ToList();
-#pragma warning restore IDE0028
         }
         catch (StorageException ex)
         {
