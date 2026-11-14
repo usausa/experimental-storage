@@ -65,7 +65,7 @@ public partial class FileBrowser : IAsyncDisposable
     {
         "size" => sortAsc ? objects.OrderBy(static x => x.Size) : objects.OrderByDescending(static x => x.Size),
         "modified" => sortAsc ? objects.OrderBy(static x => x.LastModified) : objects.OrderByDescending(static x => x.LastModified),
-        _ => sortAsc ? objects.OrderBy(static x => x.Key) : objects.OrderByDescending(static x => x.Key)
+        _ => sortAsc ? objects.OrderBy(static x => x.Key, StringComparer.Ordinal) : objects.OrderByDescending(static x => x.Key, StringComparer.Ordinal)
     };
 
     //--------------------------------------------------------------------------------
