@@ -1311,7 +1311,7 @@ public sealed class StorageService : IStorageService, IDisposable
             });
         }
 
-        return result.OrderBy(static x => x.Key).ToList();
+        return result.OrderBy(static x => x.Key, StringComparer.Ordinal).ToList();
     }
 
     public async ValueTask<ObjectData> GetObjectVersionAsync(string bucket, string key, string versionId, CancellationToken token = default)

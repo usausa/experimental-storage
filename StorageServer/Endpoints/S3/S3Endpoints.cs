@@ -327,13 +327,13 @@ public static class S3Endpoints
         }
 
         if ((headers.IfModifiedSince is not null) &&
-            DateTimeOffset.TryParse(headers.IfModifiedSince, out var ims))
+            DateTimeOffset.TryParse(headers.IfModifiedSince, CultureInfo.InvariantCulture, out var ims))
         {
             options = options with { IfModifiedSince = ims };
         }
 
         if ((headers.IfUnmodifiedSince is not null) &&
-            DateTimeOffset.TryParse(headers.IfUnmodifiedSince, out var ius))
+            DateTimeOffset.TryParse(headers.IfUnmodifiedSince, CultureInfo.InvariantCulture, out var ius))
         {
             options = options with { IfUnmodifiedSince = ius };
         }

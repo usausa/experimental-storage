@@ -19,7 +19,7 @@
                 <div class="meta-row"><span class="meta-label">Content-Type</span><span class="meta-value">@metadata.ContentType</span></div>
                 <div class="meta-row"><span class="meta-label">Size</span><span class="meta-value">@FormatBytes(metadata.ContentLength)</span></div>
                 <div class="meta-row"><span class="meta-label">ETag</span><span class="meta-value">@metadata.ETag</span></div>
-                <div class="meta-row"><span class="meta-label">Last Modified</span><span class="meta-value">@metadata.LastModified.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss")</span></div>
+                <div class="meta-row"><span class="meta-label">Last Modified</span><span class="meta-value">@metadata.LastModified.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)</span></div>
                 <div class="meta-row"><span class="meta-label">Storage Class</span><span class="meta-value">@metadata.StorageClass</span></div>
                 <div class="meta-row"><span class="meta-label">ACL</span><span class="meta-value">@metadata.Acl</span></div>
                 @if (metadata.VersionId is not null)

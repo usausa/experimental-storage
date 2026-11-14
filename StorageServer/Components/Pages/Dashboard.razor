@@ -56,7 +56,7 @@
                     <div class="bucket-col-name">
                         <a href="/browse/@b.Info.Name">@b.Info.Name</a>
                     </div>
-                    <div class="bucket-col-created">@b.Info.CreatedAt.LocalDateTime.ToString("yyyy/MM/dd HH:mm")</div>
+                    <div class="bucket-col-created">@b.Info.CreatedAt.LocalDateTime.ToString("yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture)</div>
                     <div class="bucket-col-objects">@(b.Stats?.ObjectCount ?? 0)</div>
                     <div class="bucket-col-size">@FormatBytes(b.Stats?.TotalSizeBytes ?? 0)</div>
                     <div class="bucket-col-actions">

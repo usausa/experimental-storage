@@ -193,7 +193,7 @@
                                 <span class="version-badge version-badge-del">Deleted</span>
                             </div>
                             <div class="fb-col-size">@FormatBytes(obj.Size)</div>
-                            <div class="fb-col-modified">@obj.LastModified.LocalDateTime.ToString("yyyy/MM/dd HH:mm")</div>
+                            <div class="fb-col-modified">@obj.LastModified.LocalDateTime.ToString("yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture)</div>
                             <div class="fb-col-actions">
                                 <button class="btn-se-icon" title="Show versions to restore"
                                         @onclick:stopPropagation="true"
@@ -223,7 +223,7 @@
                             </div>
                             <div class="fb-col-name">@displayName</div>
                             <div class="fb-col-size">@FormatBytes(obj.Size)</div>
-                            <div class="fb-col-modified">@obj.LastModified.LocalDateTime.ToString("yyyy/MM/dd HH:mm")</div>
+                            <div class="fb-col-modified">@obj.LastModified.LocalDateTime.ToString("yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture)</div>
                             <div class="fb-col-actions">
                                 <button class="btn-se-icon" title="Versions"
                                         @onclick:stopPropagation="true"
@@ -295,7 +295,7 @@
                         <div class="version-info">
                             <span class="version-id">@v.VersionId</span>
                             @if (v.IsCurrent) { <span class="version-badge">Current</span> }
-                            <span class="version-meta">@v.LastModified.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss") · @FormatBytes(v.Size)</span>
+                            <span class="version-meta">@v.LastModified.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) · @FormatBytes(v.Size)</span>
                         </div>
                         <div class="version-actions">
                             <button class="btn-se-icon" title="Preview this version"
